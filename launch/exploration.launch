@@ -1,0 +1,15 @@
+<launch>
+    <include file="$(find baxter_moveit_config)/launch/launch_yyj/planning_context_yyj.launch" />
+
+    <!-- Sensors Functionality -->
+    <include ns="Exploration" file="$(find baxter_moveit_config)/launch/launch_yyj/sensor_manager_yyj.launch.xml" >
+        <arg name="moveit_sensor_manager" value="baxter" />
+    </include>
+
+    <node name="Exploration" pkg="exploration_baxter" type="Exploration" respawn="false"
+        output="screen" >
+        <remap from="/joint_states" to="/robot/joint_states" />
+        <param name="capabilities" value="move_group/MoveGroupGetPlanningSceneService" />
+
+    </node>
+</launch>

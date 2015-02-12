@@ -7,7 +7,9 @@ project(exploration_baxter)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
+  tf
   moveit_ros_planning
+  moveit_ros_move_group
 )
 
 ## System dependencies are found with CMake's conventions
@@ -103,7 +105,7 @@ include_directories(
 # )
 
 ## Declare a cpp executable
-# add_executable(exploration_baxter_node src/exploration_baxter_node.cpp)
+# add_executable(exploration_baxter_node src/exploration_baxter_node.cppadd_executable(Exploration src/exploration.cpp)
 add_executable(Exploration src/exploration.cpp)
 
 ## Add cmake target dependencies of the executable/library
