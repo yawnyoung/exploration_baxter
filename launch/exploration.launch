@@ -11,5 +11,7 @@
         <remap from="/joint_states" to="/robot/joint_states" />
         <param name="capabilities" value="move_group/MoveGroupGetPlanningSceneService" />
 
+
+
     </node>
 </launch>

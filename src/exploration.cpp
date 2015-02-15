@@ -1,7 +1,9 @@
-/****************************************************
- * This program is the MAIN PROCESS for the BAXTER
- * EXPLORATION PROJECT.
- ***************************************************/
+/************************************************************
+ * This program is the Planning Scene Server for the BAXTER
+ * EXPLORATION PROJECT. It starts the "get_planning_scene"
+ * service so that other nodes can obtain Planning Scene.
+ * Actually, this is a kind of modification of move_group.
+ ***********************************************************/
 
 #include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <moveit/macros/console_colors.h>
@@ -143,21 +145,20 @@ int main(int argc, char** argv)
 
 
     //planning_scene_monitor::LockedPlanningSceneRW planning_scene_locked(planning_scene_monitor);
-    ROS_INFO("HEREHEIRE");
+    planning_scene::PlanningScenePtr ps = planning_scene_monitor->getPlanningScene();
     ros::Time begin = ros::Time::now();
-    while (planning_scene_monitor->requestPlanningSceneState())
+    while (ros::ok() && ps)
     {
-        planning_scene::PlanningScenePtr ps = planning_scene_monitor->getPlanningScene();
+        //planning_scene::PlanningScenePtr ps = planning_scene_monitor->getPlanningScene();
         std::vector<std::string> obj_id = ps->getWorld()->getObjectIds();
-        ros::Time begin = ros::Time::now();
         if (!obj_id.empty()) {
             ROS_INFO("Object get");
             ros::Duration elapsed_time = ros::Time::now() - begin;
-            ROS_INFO_STREAM("Time elapsed: " << elapsed_time << "sec.");
+            ROS_INFO_STREAM("Time elapsed: " << elapsed_time << " sec.");
             break;
         }
     }
-    planning_scene::PlanningScenePtr ps = planning_scene_monitor->getPlanningScene();
+    //planning_scene::PlanningScenePtr ps = planning_scene_monitor->getPlanningScene();
     std::vector<std::string> obj_id = ps->getWorld()->getObjectIds();
     std::cout << obj_id.size() << std::endl;
     for (std::vector<std::string>::iterator it = obj_id.begin(); it != obj_id.end(); ++it)
@@ -165,7 +166,30 @@ int main(int argc, char** argv)
         std::cout << *it << std::endl;
     }
 
-    collision_detection::World::ObjectConstPtr obj = ps->getWorld()->getObject(planning_scene::PlanningScene::OCTOMAP_NS);
+    collision_detection::World::ObjectConstPtr obj_octm = ps->getWorld()->getObject(planning_scene::PlanningScene::OCTOMAP_NS);
+    if (obj_octm) {
+        ROS_INFO("OCTOMAP GET");
+        const shapes::OcTree* ot_shape = dynamic_cast<const shapes::OcTree*>(obj_octm->shapes_[0].get());
+        if (ot_shape) {
+            ROS_INFO("Cast shape octree to octomap octree");
+            boost::shared_ptr<const octomap::OcTree> ot = ot_shape->octree;
+            for (unsigned int i = 0; i < 5; ++i)
+            {
+                std::string i_str;
+                std::stringstream out;
+                out << i;
+                i_str = out.str();
+                std::string FileName = "my_octomap" + i_str;
+                FileName += ".ot";
+                ot->write(FileName);
+                ROS_INFO("WRITE!");
+                ros::Duration(2).sleep();
+            }
+        } else {
+            ROS_ERROR("Failed to cast shape octree to octomap octree");
+        }
+        //TODO plan!
+    }
 /*
     while (!obj) {
         ROS_INFO("OCTOMAP NOT GET");

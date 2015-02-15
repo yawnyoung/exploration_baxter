@@ -107,6 +107,7 @@ include_directories(
 ## Declare a cpp executable
 # add_executable(exploration_baxter_node src/exploration_baxter_node.cppadd_executable(Exploration src/exploration.cpp)
 add_executable(Exploration src/exploration.cpp)
+add_executable(NBV_MP src/nbv_mp.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -114,6 +115,9 @@ add_executable(Exploration src/exploration.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(Exploration
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(NBV_MP
   ${catkin_LIBRARIES}
 )
 
