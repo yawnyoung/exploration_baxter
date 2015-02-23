@@ -57,6 +57,7 @@ namespace move_group {
         else
             ROS_ERROR("No MoveGroup context created. Nothing will work.");
     }
+
     void CapabilityLoad::configureCapabilities()
     {
         try {
@@ -165,7 +166,7 @@ int main(int argc, char** argv)
     {
         std::cout << *it << std::endl;
     }
-
+/*
     collision_detection::World::ObjectConstPtr obj_octm = ps->getWorld()->getObject(planning_scene::PlanningScene::OCTOMAP_NS);
     if (obj_octm) {
         ROS_INFO("OCTOMAP GET");
@@ -189,7 +190,7 @@ int main(int argc, char** argv)
             ROS_ERROR("Failed to cast shape octree to octomap octree");
         }
         //TODO plan!
-    }
+    }*/
 /*
     while (!obj) {
         ROS_INFO("OCTOMAP NOT GET");

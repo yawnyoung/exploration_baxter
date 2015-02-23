@@ -109,6 +109,7 @@ include_directories(
 add_executable(Exploration src/exploration.cpp)
 add_executable(NBV_MP src/nbv_mp.cpp)
 
+
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(exploration_baxter_node exploration_baxter_generate_messages_cpp)
