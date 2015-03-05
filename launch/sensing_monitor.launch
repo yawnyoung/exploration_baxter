@@ -1,0 +1,8 @@
+<launch>
+
+    <include ns="ExplSensingMonitor" file="$(find baxter_moveit_config)/launch/launch_yyj/sensor_manager_yyj.launch.xml" >
+        <arg name="moveit_sensor_manager" value="baxter" />
+    </include>
+
+    <node name="ExplSensingMonitor" pkg="exploration_baxter" type="ExplSensingMonitor" respawn="false" output="screen"/>
+</launch>

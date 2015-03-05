@@ -94,7 +94,7 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-# include_directories(include)
+include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
@@ -108,6 +108,8 @@ include_directories(
 # add_executable(exploration_baxter_node src/exploration_baxter_node.cppadd_executable(Exploration src/exploration.cpp)
 add_executable(Exploration src/exploration.cpp)
 add_executable(NBV_MP src/nbv_mp.cpp)
+add_executable(ExplSensingMonitor src/exploration_sensing_monitor.cpp)
+add_executable(Test src/test.cpp)
 
 
 ## Add cmake target dependencies of the executable/library
@@ -121,6 +123,14 @@ target_link_libraries(Exploration
 target_link_libraries(NBV_MP
   ${catkin_LIBRARIES}
 )
+target_link_libraries(ExplSensingMonitor
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(Test
+  ${catkin_LIBRARIES}
+)
+
+
 
 #############
 ## Install ##
