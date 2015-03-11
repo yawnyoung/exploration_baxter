@@ -108,8 +108,8 @@ include_directories(
 # add_executable(exploration_baxter_node src/exploration_baxter_node.cppadd_executable(Exploration src/exploration.cpp)
 add_executable(Exploration src/exploration.cpp)
 add_executable(NBV_MP src/nbv_mp.cpp)
-add_executable(ExplSensingMonitor src/exploration_sensing_monitor.cpp)
 add_executable(Test src/test.cpp)
+add_executable(InitPos src/init_pos.cpp)
 
 
 ## Add cmake target dependencies of the executable/library
@@ -123,12 +123,13 @@ target_link_libraries(Exploration
 target_link_libraries(NBV_MP
   ${catkin_LIBRARIES}
 )
-target_link_libraries(ExplSensingMonitor
-  ${catkin_LIBRARIES}
-)
 target_link_libraries(Test
   ${catkin_LIBRARIES}
 )
+target_link_libraries(InitPos
+  ${catkin_LIBRARIES}
+)
+
 
 
 

@@ -1,10 +1,9 @@
 /*************************************************
  * TEST for CLASSES...
  ************************************************/
-
-#include "ros/ros.h"
-
 #include "exploration_baxter/dir_vec.h"
+#include "exploration_baxter/nbv_module.h"
+
 #include <octomap_msgs/Octomap.h>
 #include <octomap_msgs/conversions.h>
 
@@ -24,31 +23,6 @@ int main(int argc, char ** argv)
     std::string ot_topic = "/octomap_binary";
     ros::Subscriber ot_sub = nh.subscribe(ot_topic, 1, otCB);
 
-    // publish arrow of direction to rviz
-    ros::Publisher marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 1);
-    // set the shape type to be an arrow
-    unsigned int shape = visualization_msgs::Marker::ARROW;
-    // set the start point of arrow
-    geometry_msgs::Point start;
-
-    start.x = 0;
-    start.y = 0;
-    start.z = 0;
-    // end point of arrow
-    geometry_msgs::Point end;
-
-    // publish octomap node to rviz
-    //ros::Publisher occ_pub = nh.advertise<visualization_msgs::MarkerArray>("occupied_cells", 1);
-
-    // set octomap box boundary
-    octomap::point3d bbxmin(0.3, -0.5, -0.2);
-    octomap::point3d bbxmax(0.6, -0.2, 0.2);
-    CalDir cal_dir(bbxmin, bbxmax, nh);
-    ROS_INFO("Create CalDir class.");
-
-    // direction vector
-    octomap::point3d direction;
-
     ros::Rate wait(10);
     while (!ot) {
         ROS_INFO("Waiting for octomap message .......");
@@ -56,42 +30,88 @@ int main(int argc, char ** argv)
         wait.sleep();
     }
 
+    octomap::point3d obsrvbbxmin, obsrvbbxmax, freebbxmin, freebbxmax;
+
+    int region = 1;
+    while (ros::ok() && region < 4)
+    {
+        if (region == 1) {
+            // set octomap box boundary
+            obsrvbbxmin.x() = -0.943;
+            obsrvbbxmin.y() = -1.305;
+            obsrvbbxmin.z() = -0.17;
+            obsrvbbxmax.x() = -0.1;
+            obsrvbbxmax.y() = -0.6;
+            obsrvbbxmax.z() = 0.5;
+            freebbxmin.x() = -0.943;
+            freebbxmin.y() = -0.6;
+            freebbxmin.z() = -0.2;
+            freebbxmax.x() = -0.1;
+            freebbxmax.y() = 0;
+            freebbxmax.z() = 1;
+        }
+        else if (region == 2) {
+            // set octomap box boundary
+            obsrvbbxmin.x() = -0.943;
+            obsrvbbxmin.y() = -1.305;
+            obsrvbbxmin.z() = -0.17;
+            obsrvbbxmax.x() = -0.1;
+            obsrvbbxmax.y() = -0.6;
+            obsrvbbxmax.z() = 0.5;
+            freebbxmin.x() = -0.943;
+            freebbxmin.y() = -0.6;
+            freebbxmin.z() = -0.2;
+            freebbxmax.x() = -0.1;
+            freebbxmax.y() = 0;
+            freebbxmax.z() = 1;
+        }
+        else if (region == 3) {
+            // set octomap box boundary
+            obsrvbbxmin.x() = -0.943;
+            obsrvbbxmin.y() = -1.305;
+            obsrvbbxmin.z() = -0.17;
+            obsrvbbxmax.x() = -0.1;
+            obsrvbbxmax.y() = -0.6;
+            obsrvbbxmax.z() = 0.5;
+            freebbxmin.x() = -0.943;
+            freebbxmin.y() = -0.6;
+            freebbxmin.z() = -0.2;
+            freebbxmax.x() = -0.1;
+            freebbxmax.y() = 0;
+            freebbxmax.z() = 1;
+        }
+        else {
+            ROS_ERROR("Region Number Error.");
+        }
+
+    // test for nbv_module
+    NBVModule *nbv_module = new NBVModule(obsrvbbxmin, obsrvbbxmax, freebbxmin, freebbxmax, ot, nh);
+    bool disp = true;
+
     ros::Rate r(1);
 
     while (ros::ok() && ot) {
         ros::spinOnce();
-        direction = cal_dir.cal_dirvec_sensor(ot);
-        /*
-        start.x = cal_dir.sensor_origin.x();
-        start.y = cal_dir.sensor_origin.y();
-        start.z = cal_dir.sensor_origin.z();*/
-        visualization_msgs::Marker marker;
-        // set the frame id and timestamp
-        marker.header.frame_id = "/camera_rgb_optical_frame";
-        marker.header.stamp = ros::Time::now();
-        marker.ns = "basic_shapes";
-        marker.id = 0;
-        marker.type = shape;
-        marker.action = visualization_msgs::Marker::ADD;
-        end.x = direction.x();
-        end.y = direction.y();
-        end.z = direction.z();
-        marker.points.push_back(start);
-        marker.points.push_back(end);
-        marker.scale.x = 0.005;
-        marker.scale.y = 0.005;
-        marker.scale.z = 0.005;
-        marker.color.r = 0.0f;
-        marker.color.g = 0.0f;
-        marker.color.b = 1.0f;
-        marker.color.a = 1.0;
-        marker.lifetime = ros::Duration();
-
-        marker_pub.publish(marker);
-
-        cal_dir.cell_vis();
-
+        if (nbv_module->update_nbv(ot)) {
+            ROS_INFO("NBV Module updated!");
+            nbv_module->trvs_tree();
+            nbv_module->cal_dirvec(disp);
+            nbv_module->explr_bd();
+            //nbv_module.intersection();
+            nbv_module->nearestfrt();
+        }
+        else {
+            ROS_ERROR("Failed to update NBV Module!");
+        }
+        // whether or not terminate based on how many unknown nodes remain
+        if (nbv_module->num_unknown < 6) {
+            ROS_INFO_STREAM("Complete exploration of region " << region << ".");
+            region++;
+            delete nbv_module;
+            break;
+        }
         r.sleep();
+    }
     }
     return 0;
 }

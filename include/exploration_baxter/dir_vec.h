@@ -37,6 +37,7 @@ class CalDir {
     // average direction vector
     point3d dir_vec;
 
+    // Octree to calculate direction vector
     OcTree *ot_map;
     int m_treeDepth;
     // markers for visualization
@@ -168,6 +169,7 @@ point3d CalDir::cal_dirvec_sensor(OcTree *ot)
     origin_m.color.a = 1;
     origin_m.lifetime = ros::Duration();
     org_pub.publish(origin_m);
+
     ot_map = ot;
     m_treeDepth = ot_map->getTreeDepth();
 
@@ -193,15 +195,9 @@ point3d CalDir::cal_dirvec_sensor(OcTree *ot)
                 OcTreeNode *node = ot_map->search(bbxkey);
                 if (!node) {
                     point3d vec_base = ot_map->keyToCoord(bbxkey);
-
-                    /*point3d vec_sensor;
-                    vec_sensor.x() = vec_base.x() - sensor_origin.x();
-                    vec_sensor.y() = vec_base.y() - sensor_origin.y();
-                    vec_sensor.z() = vec_base.z() - sensor_origin.z();*/
-
                     // transform vector from base frame to sensor origin frame
-                    tf::Vector3 pt_tf = transform.inverse()*octomap::pointOctomapToTf((ot_map->keyToCoord(bbxkey)));
-                    vects_.push_back(octomap::pointTfToOctomap(pt_tf));
+                    tf::Vector3 pt_tf = transform.inverse()*pointOctomapToTf((ot_map->keyToCoord(bbxkey)));
+                    vects_.push_back(pointTfToOctomap(pt_tf));
                 }
             }
         }
@@ -211,24 +207,11 @@ point3d CalDir::cal_dirvec_sensor(OcTree *ot)
     point3d init(0, 0, 0);
     //point3d sum_vec(0, 0, 0);
     point3d sum_vec = std::accumulate(vects_.begin(), vects_.end(), init);
-    /*
-    for (std::vector<point3d>::iterator iter = vects_.begin(); iter != vects_.end(); ++iter)
-    {
-        sum_vec.x() += (*iter).x();
-        sum_vec.y() += (*iter).y();
-        sum_vec.z() += (*iter).z();
-    }*/
 
     // average of sum
     unsigned int v_size = vects_.size();
     std::cout << "unknown nodes: " << v_size << std::endl;
     point3d avg_vec(sum_vec.x()/v_size, sum_vec.y()/v_size, sum_vec.z()/v_size);
-    /*
-    point3d vec_sensor;
-    vec_sensor.x() = avg_vec.x() - sensor_origin.x();
-    vec_sensor.y() = avg_vec.y() - sensor_origin.y();
-    vec_sensor.z() = avg_vec.z() - sensor_origin.z();*/
-    //point3d norm_vec = avg_vec.normalize();
 
     return avg_vec;
 
