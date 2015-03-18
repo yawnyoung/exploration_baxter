@@ -10,6 +10,7 @@
  *            Calculate intersection point;
  *            Calculate the nearest frontier to sensor;
  *            Calculate next best view candidates;
+ *            Test function for motion planning with obstacle avoidance;
  *
  *
  * ********************************************************************************/
@@ -28,6 +29,12 @@
 #include <geometry_msgs/Point.h>
 #include <std_msgs/ColorRGBA.h>
 
+#include <moveit/robot_model_loader/robot_model_loader.h>
+#include <moveit/planning_pipeline/planning_pipeline.h>
+#include <moveit/planning_interface/planning_interface.h>
+#include <moveit_msgs/RobotState.h>
+#include <octomap_msgs/conversions.h>
+
 using namespace octomap;
 
 class NBVModule {
@@ -35,7 +42,8 @@ class NBVModule {
     // Ros NodeHandle
     ros::NodeHandle nh_;
     // Octree
-    OcTree *ot_nbv;
+    OcTree *ot_nbv;     // Octomap for calculating next best view
+    OcTree *ot_mp;      // Octomap for motion planning
     // Tree max depth
     int m_treeDepth;
 
@@ -81,10 +89,24 @@ class NBVModule {
     // Data members for calculating next best view candidates
     std::vector<point3d> candidates;
 
+    // Data members for motion planning with obstacle avoidance
+    robot_model_loader::RobotModelLoader *robot_model_loader;
+    robot_model::RobotModelPtr kinematic_model;
+    planning_scene::PlanningScenePtr planning_scene;
+    //planning_pipeline::PlanningPipeline *planning_pipeline;
+    boost::scoped_ptr<pluginlib::ClassLoader<planning_interface::PlannerManager> > planner_plugin_loader;
+    planning_interface::PlannerManagerPtr planner_instance;
+    std::string planner_plugin_name;
+    visualization_msgs::MarkerArray mpoccNodesVis;      // markers of occupied nodes in motion planning octomap for visualization
+    ros::Publisher mpocc_pub;       // publisher of display occupied markers in motion planning octomap
+    octomap_msgs::Octomap ot_msg;       // octomap message processed in planning scene
+    planning_interface::MotionPlanResponse res;     // response of motion planning
+
     public:
         // Number of unknown nodes
         unsigned int num_unknown;
 
+        std::string end_effector_name;      // end effector of the planned group
         /**
          * Constructor function
          * @param input boundary coordinates, octree
@@ -117,7 +139,7 @@ class NBVModule {
          */
         //void explr_bd(OcTreeNode *frt_node, std::vector<int> no_child, std::vector<int> noch_rev);
         //void explr_bd(OcTree::tree_iterator tree_it, std::vector<int> no_child, std::vector<int> noch_rev);
-        void explr_bd();
+        void explr_bd(moveit_msgs::RobotState robot_state);
 
         /**
          * Set configuration of markerarray to be displayed
@@ -145,6 +167,11 @@ class NBVModule {
          * Calculate the next best view candidates on spherical surface
          */
         void nbvcandidates();
+
+        /**
+         * Test function for motion planning with obstacle avoidance
+         */
+        bool test_mp(planning_interface::MotionPlanRequest &req);
 };
 
 NBVModule::NBVModule(point3d obsrvbbxmin, point3d obsrvbbxmax, point3d freebbxmin, point3d freebbxmax, OcTree *ot, ros::NodeHandle n):
@@ -195,8 +222,43 @@ NBVModule::NBVModule(point3d obsrvbbxmin, point3d obsrvbbxmax, point3d freebbxmi
     unknown_pub = nh_.advertise<visualization_msgs::MarkerArray>("marker_unknown", 1);
     unknownNodesVis.markers.resize(1);
 
+    // Display configuration for occupied nodes in motion planning octomap
+    mpocc_pub = nh_.advertise<visualization_msgs::MarkerArray>("marker_mpocc", 1);
+    mpoccNodesVis.markers.resize(m_treeDepth+1);
+
     // Display configuration for intersection point
     intersect_pub = nh_.advertise<visualization_msgs::Marker>("intersection", 1);
+
+    // Construction for motion planning
+    robot_model_loader = new robot_model_loader::RobotModelLoader("robot_description");
+    kinematic_model = robot_model_loader->getModel();
+    planning_scene = boost::shared_ptr<planning_scene::PlanningScene>(new planning_scene::PlanningScene(kinematic_model));
+    //planning_pipeline = new planning_pipeline::PlanningPipeline(kinematic_model, nh_, "planning_plugin", "request_adapters");
+
+    // SETUP THE PLANNER
+    if (!nh_.getParam("planning_plugin", planner_plugin_name)) {
+        ROS_FATAL_STREAM("Could not find planner plugin name");
+    }
+    try {
+        planner_plugin_loader.reset(new pluginlib::ClassLoader<planning_interface::PlannerManager>("moveit_core", "planning_interface::PlannerManager"));
+    } catch (pluginlib::PluginlibException& ex) {
+        ROS_FATAL_STREAM("Exception while creating planning plugin loader" << ex.what());
+    }
+    try {
+        planner_instance.reset(planner_plugin_loader->createUnmanagedInstance(planner_plugin_name));
+        if (!planner_instance->initialize(kinematic_model, nh_.getNamespace())) {
+            ROS_FATAL_STREAM("Could not initialize planner instance");
+        }
+        ROS_INFO_STREAM("Using planning interface '" << planner_instance->getDescription() << "'");
+    } catch (pluginlib::PluginlibException& ex) {
+        const std::vector<std::string> &classes = planner_plugin_loader->getDeclaredClasses();
+        std::stringstream ss;
+        for (std::size_t i = 0; i < classes.size(); i++)
+        {
+            ss << classes[i] << " ";
+        }
+        ROS_ERROR_STREAM("Exception while loading planner '" << planner_plugin_name << "'" <<ex.what() << std::endl << "Available plugins: " << ss.str());
+    }
 
 
     if (m_treeDepth == 16) {
@@ -257,6 +319,7 @@ bool NBVModule::trvs_tree()
     tf::Vector3 pt_tf;      // vector in 'camera_rgb_optical_frame'
 
     // set free bounding box to be the box we want to set free nodes in it
+    ot_mp = ot_nbv;
     ot_nbv->setBBXMin(freebbxmin_);
     ot_nbv->setBBXMax(freebbxmax_);
 
@@ -272,6 +335,7 @@ bool NBVModule::trvs_tree()
                 if (ot_nbv->inBBX(bbxkey)) {
                     // update node to be free in free bounding box
                     ot_nbv->updateNode(bbxkey, false, false);
+                    ot_mp->updateNode(bbxkey, false, false);
                 }
                 srch_node = ot_nbv->search(bbxkey);
 
@@ -392,7 +456,7 @@ void NBVModule::explr_bd(OcTree::tree_iterator tree_it, std::vector<int> no_chil
     }
 }*/
 
-void NBVModule::explr_bd()
+void NBVModule::explr_bd(moveit_msgs::RobotState robot_state)
 {
     OcTreeLUT lut(16);      // lookup table for finding neighbors
     OcTreeKey nb_key;       // key of neighbor
@@ -440,7 +504,12 @@ void NBVModule::explr_bd()
         {
             lut.genNeighborKey(leaf_key, *nb_dir_it, nb_key);
             if (!ot_nbv->search(nb_key)) {
-                check_key = ot_nbv->coordToKey(leaf_it.getCoordinate());
+                // set frontier nodes as occupied nodes for motion planning octomap
+                if (leaf_key[0] < bbxmaxkey[0]) {
+                    ot_mp->updateNode(leaf_key, true, false);
+                }
+                //ot_mp->updateNode(leaf_key, true, false);
+                check_key = ot_nbv->coordToKey(leaf_it.getCoordinate());        // unnecessary for leaf_key already exists
                 if (check_key[0] > bbxminkey[0] && check_key[0] < bbxmaxkey[0]
                  && check_key[1] > bbxminkey[1] && check_key[1] < bbxmaxkey[1]
                  && check_key[2] > bbxminkey[2] && check_key[2] < bbxmaxkey[2] ) {
@@ -466,7 +535,35 @@ void NBVModule::explr_bd()
             freeNodesVis.markers[idx].points.push_back(cubeCenter_known);
             num_free++;
         }
+        if (ot_mp->isNodeOccupied(ot_mp->search(leaf_key))) {
+            mpoccNodesVis.markers[idx].points.push_back(cubeCenter_known);
+        }
         is_frt = false;
+    }
+
+    // Convert octomap to octomap message
+    if (octomap_msgs::fullMapToMsg(*ot_mp, ot_msg)) {
+        planning_scene->processOctomapMsg(ot_msg);
+        planning_scene->setCurrentState(robot_state);
+
+        // display current state
+        robot_state::RobotState currt_state = planning_scene->getCurrentStateNonConst();
+        const robot_state::JointModelGroup *joint_model_group = currt_state.getJointModelGroup("right_arm");
+        end_effector_name = joint_model_group->getLinkModelNames().back();
+        ROS_INFO_STREAM("The end_effector_name is: " << end_effector_name);
+        std::vector<std::string> link_name(joint_model_group->getLinkModelNames());
+        std::vector<std::string> joint_name(joint_model_group->getJointModelNames());
+        ROS_INFO("Link names: ");
+        for (int i = 0; i < link_name.size(); i++) {
+            std::cout << link_name[i] << std::endl;
+        }
+        ROS_INFO("Joint names: ");
+        for (int i = 0; i < joint_name.size(); i++) {
+            std::cout << joint_name[i] << std::endl;
+        }
+
+        std::cout << std::endl << std::endl;
+        ROS_INFO("Convert octomap to octomap message!");
     }
     std_msgs::ColorRGBA frt_color;
     frt_color.r = 1;
@@ -499,6 +596,17 @@ void NBVModule::explr_bd()
     free_pub.publish(freeNodesVis);
     for (int i = 0; i < freeNodesVis.markers.size(); i++) {
         freeNodesVis.markers[i].points.clear();
+    }
+
+    std_msgs::ColorRGBA mpocc_color;
+    mpocc_color.r = 0.3;
+    mpocc_color.g = 0.6;
+    mpocc_color.b = 0.9;
+    mpocc_color.a = 1;
+    disp_mkarr(mpoccNodesVis, mpocc_color);
+    mpocc_pub.publish(mpoccNodesVis);
+    for (int i = 0; i < mpoccNodesVis.markers.size(); i++) {
+        mpoccNodesVis.markers[i].points.clear();
     }
 
     ROS_INFO("Number of occupied nodes: %d", num_occ);
@@ -645,4 +753,16 @@ void NBVModule::nearestfrt()
 void NBVModule::nbvcandidates()
 {
 
+}
+
+bool NBVModule::test_mp(planning_interface::MotionPlanRequest &req)
+{
+    //planning_pipeline->generatePlan(planning_scene, req, res);
+    planning_interface::PlanningContextPtr context = planner_instance->getPlanningContext(planning_scene, req, res.error_code_);
+    context->solve(res);
+    // Check whether the planning was successful
+    if (res.error_code_.val != res.error_code_.SUCCESS) {
+        ROS_ERROR("Could not compute plan successfully");
+        return false;
+    }
 }

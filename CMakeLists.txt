@@ -10,7 +10,13 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   moveit_ros_planning
   moveit_ros_move_group
+  message_filters
+  pcl_ros
+  pcl_conversions
 )
+find_package(PCL REQUIRED QUIET COMPONENTS common sample_consensus io segmentation filters)
+
+find_package(Boost REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -82,10 +88,10 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES exploration_baxter
-#  CATKIN_DEPENDS roscpp rospy
-#  DEPENDS system_lib
+  INCLUDE_DIRS include
+  LIBRARIES ${PROJECT_NAME}
+  CATKIN_DEPENDS roscpp rospy message_filters
+  DEPENDS system_lib octomap PCL
 )
 
 ###########
@@ -96,13 +102,16 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(include)
 include_directories(
-  ${catkin_INCLUDE_DIRS}
+    ${catkin_INCLUDE_DIRS}
+    ${PCL_INCLUDE_DIRS}
+    ${Boost_INCLUDE_DIRS}
 )
 
 ## Declare a cpp library
 # add_library(exploration_baxter
 #   src/${PROJECT_NAME}/exploration_baxter.cpp
 # )
+add_library(${PROJECT_NAME} src/octomap_builder.cpp src/visualization.cpp src/MPmap_filter.cpp)
 
 ## Declare a cpp executable
 # add_executable(exploration_baxter_node src/exploration_baxter_node.cppadd_executable(Exploration src/exploration.cpp)
@@ -110,12 +119,12 @@ add_executable(Exploration src/exploration.cpp)
 add_executable(NBV_MP src/nbv_mp.cpp)
 add_executable(Test src/test.cpp)
 add_executable(InitPos src/init_pos.cpp)
-
+add_executable(octomap_builder_test src/test_octobuild.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(exploration_baxter_node exploration_baxter_generate_messages_cpp)
-
+add_dependencies(octomap_builder_test ${PROJECT_NAME})
 ## Specify libraries to link a library or executable target against
 target_link_libraries(Exploration
   ${catkin_LIBRARIES}
@@ -129,6 +138,15 @@ target_link_libraries(Test
 target_link_libraries(InitPos
   ${catkin_LIBRARIES}
 )
+
+target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(octomap_builder_test
+  ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+)
+
+
 
 
 

@@ -10,10 +10,19 @@
 // display on rviz
 #include <visualization_msgs/Marker.h>
 
+#include <geometry_msgs/PoseStamped.h>
+//#include <moveit_msgs/Constraints.h>
+#include <moveit/kinematic_constraints/utils.h>
+
+#include <sensor_msgs/JointState.h>
+
 // global variable of octree
 octomap::OcTree* ot;
+// global robot state (joint states)
+moveit_msgs::RobotState rt_state;
 // Callback function to obtain octomap_msgs.
 void otCB (const octomap_msgs::OctomapConstPtr& msg);
+void RobotStateCB(const sensor_msgs::JointStateConstPtr& msg);
 
 int main(int argc, char ** argv)
 {
@@ -22,6 +31,9 @@ int main(int argc, char ** argv)
 
     std::string ot_topic = "/octomap_binary";
     ros::Subscriber ot_sub = nh.subscribe(ot_topic, 1, otCB);
+
+    std::string robot_state_topic = "/robot/joint_states";
+    ros::Subscriber robot_state_sub = nh.subscribe(robot_state_topic, 1, RobotStateCB);
 
     ros::Rate wait(10);
     while (!ot) {
@@ -32,6 +44,27 @@ int main(int argc, char ** argv)
 
     octomap::point3d obsrvbbxmin, obsrvbbxmax, freebbxmin, freebbxmax;
 
+
+    planning_interface::MotionPlanRequest request;
+    geometry_msgs::PoseStamped my_pose;
+    my_pose.header.frame_id = "/base";
+    my_pose.pose.position.x = -0.5;
+    my_pose.pose.position.y = -0.5;
+    my_pose.pose.position.z = 0.280;
+    my_pose.pose.orientation.x = 0.667;
+    my_pose.pose.orientation.y = 0.663;
+    my_pose.pose.orientation.z = -0.250;
+    my_pose.pose.orientation.w = -0.233;
+
+    // tolerance of 0.01(m) is specified in position
+    // and 0.01(radians) in orientation
+    std::vector<double> tolerance_pose(3, 0.01);
+    std::vector<double> tolerance_angle(3, 0.1);
+
+    request.group_name = "right_arm";
+
+    //moveit_msgs::Constraints pose_goal = kinematic_constraints::constructGoalConstraints(n, my_pose);
+    //request.goal_constraints.push_back(pose_goal);
     int region = 1;
     while (ros::ok() && region < 4)
     {
@@ -96,9 +129,14 @@ int main(int argc, char ** argv)
             ROS_INFO("NBV Module updated!");
             nbv_module->trvs_tree();
             nbv_module->cal_dirvec(disp);
-            nbv_module->explr_bd();
-            //nbv_module.intersection();
-            nbv_module->nearestfrt();
+            nbv_module->explr_bd(rt_state);
+            moveit_msgs::Constraints pose_goal = kinematic_constraints::constructGoalConstraints(nbv_module->end_effector_name, my_pose);
+            request.goal_constraints.push_back(pose_goal);
+            //nbv_module->nearestfrt();
+            nbv_module->test_mp(request);
+            rt_state.joint_state.name.clear();
+            rt_state.joint_state.position.clear();
+            request.goal_constraints.clear();
         }
         else {
             ROS_ERROR("Failed to update NBV Module!");
@@ -119,4 +157,13 @@ int main(int argc, char ** argv)
 void otCB (const octomap_msgs::OctomapConstPtr& msg)
 {
     ot = octomap_msgs::binaryMsgToMap(*msg);
+}
+
+void RobotStateCB(const sensor_msgs::JointStateConstPtr& msg)
+{
+    for (int i = 9; i < 16; i++)
+    {
+        rt_state.joint_state.name.push_back(msg->name[i]);
+        rt_state.joint_state.position.push_back(msg->position[i]);
+    }
 }
