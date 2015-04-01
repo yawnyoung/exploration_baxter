@@ -1,0 +1,30 @@
+<launch>
+    <arg name="planning_plugin" value="ompl_interface/OMPLPlanner" />
+
+    <include file="$(find baxter_moveit_config)/launch/launch_yyj/planning_context_yyj.launch">
+        <arg name="load_robot_description" value="true" />
+    </include>
+
+    <node name="octomap_builder_test" pkg="exploration_baxter" type="octomap_builder_test" output="screen" >
+        <param name="create_MPmap" value="true" />
+        <param name="resolution" value="0.01" />
+        <param name="pointcloud_min_x" value="-1.5" />
+        <param name="pointcloud_max_x" value="1.5" />
+        <param name="pointcloud_min_y" value="-1.5" />
+        <param name="pointcloud_max_y" value="0.2" />
+        <param name="pointcloud_min_z" value="-0.2" />
+        <param name="pointcloud_max_z" value="1.5" />
+        <param name="freezone_min_x" value="-0.5" />
+        <param name="freezone_min_y" value="-0.7" />
+        <param name="freezone_min_z" value="-0.2" />
+        <param name="freezone_max_x" value="0.3" />
+        <param name="freezone_max_y" value="0" />
+        <param name="freezone_max_z" value="1.5" />
+        <param name="sensor_model/max_range" value="1.0" />
+        <param name="sensor_model/lower_limit" value = "0.2" />
+        <param name="publish_frontier" value="false" />
+        <param name="planning_plugin" value="$(arg planning_plugin)" />
+    </node>
+
+    <rosparam command="load" file="$(find baxter_moveit_config)/config/ompl_planning.yaml"/>
+</launch>

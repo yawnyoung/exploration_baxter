@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_filters
   pcl_ros
   pcl_conversions
+  tf_conversions
 )
 find_package(PCL REQUIRED QUIET COMPONENTS common sample_consensus io segmentation filters)
 
@@ -111,7 +112,7 @@ include_directories(
 # add_library(exploration_baxter
 #   src/${PROJECT_NAME}/exploration_baxter.cpp
 # )
-add_library(${PROJECT_NAME} src/octomap_builder.cpp src/visualization.cpp src/MPmap_filter.cpp)
+add_library(${PROJECT_NAME} src/octomap_builder.cpp src/visualization.cpp src/MPmap_filter.cpp src/NBVStrategy.cpp src/PlannerAction.cpp)
 
 ## Declare a cpp executable
 # add_executable(exploration_baxter_node src/exploration_baxter_node.cppadd_executable(Exploration src/exploration.cpp)
