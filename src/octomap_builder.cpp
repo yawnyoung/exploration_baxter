@@ -24,7 +24,7 @@ OctomapBuilder::OctomapBuilder(ros::NodeHandle nh, bool diffmap):
     m_tfPointCloudSub(NULL)
 {
     /* Minimum and maximum values along each axis for pre-defined free zone */
-    double m_freebbxMinX, m_freebbxMinY, m_freebbxMinZ, m_freebbxMaxX, m_freebbxMaxY, m_freebbxMaxZ;
+    double m_freebbxMinX, m_freebbxMinY, m_freebbxMinZ, m_freebbxMaxX, m_freebbxMaxY, m_freebbxMaxZ, torso_freebbxMinX, torso_freebbxMaxX;
     /* Initialize octomap object & params */
     m_nh.param("resolution", m_res, m_res);
     m_nh.param("sensor_model/nbv_hit", nbv_probHit, nbv_probHit);
@@ -45,6 +45,8 @@ OctomapBuilder::OctomapBuilder(ros::NodeHandle nh, bool diffmap):
     m_nh.param("freezone_max_x", m_freebbxMaxX, m_freebbxMaxX);
     m_nh.param("freezone_max_y", m_freebbxMaxY, m_freebbxMaxY);
     m_nh.param("freezone_max_z", m_freebbxMaxZ, m_freebbxMaxZ);
+    m_nh.param("torsofree_min_x", torso_freebbxMinX, torso_freebbxMinX);
+    m_nh.param("torsofree_max_x", torso_freebbxMaxX, torso_freebbxMaxX);
     m_nh.param("sensor_model/max_range", m_maxRange, m_maxRange);
     m_nh.param("filter_speckles", m_filterSpeckles, m_filterSpeckles);
     m_nh.param("pointcloud_topic", m_pointCloudTopic, m_pointCloudTopic);
@@ -146,6 +148,49 @@ OctomapBuilder::OctomapBuilder(ros::NodeHandle nh, bool diffmap):
             }
         }
     }
+
+    /* Set pre-defined free zone for robot torso */
+    octomap::point3d torso_freebbxmin(torso_freebbxMinX, m_freebbxMaxY, m_pointcloudMinZ);
+    octomap::point3d torso_freebbxmax(torso_freebbxMaxX, m_pointcloudMaxY, m_pointcloudMaxZ);
+    octomap::OcTreeKey torso_freebbxminkey, torso_freebbxmaxkey;
+    if (nbv_octree->coordToKeyChecked(torso_freebbxmin, torso_freebbxminkey) && nbv_octree->coordToKeyChecked(torso_freebbxmax, torso_freebbxmaxkey)) {
+        sizeX = torso_freebbxmaxkey[0] - torso_freebbxminkey[0] + 1;
+        sizeY = torso_freebbxmaxkey[1] - torso_freebbxminkey[1] + 1;
+        sizeZ = torso_freebbxmaxkey[2] - torso_freebbxminkey[2] + 1;
+        if (sizeX > 0 && sizeY > 0 && sizeZ > 0) {
+            ROS_INFO("Obtain free zone range");
+        }
+        else {
+            ROS_ERROR("Size should be larger than 0. Please check the input bounding box coordinates");
+            return;
+        }
+    }
+    if (diffmap) {
+        for (int dx = 0; dx < sizeX; dx++) {
+            bbxkey[0] = torso_freebbxminkey[0] + dx;
+            for (int dy = 0; dy < sizeY; dy++) {
+                bbxkey[1] = torso_freebbxminkey[1] + dy;
+                for (int dz = 0; dz < sizeZ; dz++) {
+                    bbxkey[2] = torso_freebbxminkey[2] + dz;
+                    nbv_octree->updateNode(bbxkey, false, false);
+                    mp_octree->updateNode(bbxkey, false, false);
+                }
+            }
+        }
+    }
+    else {
+        for (int dx = 0; dx < sizeX; dx++) {
+            bbxkey[0] = torso_freebbxminkey[0] + dx;
+            for (int dy = 0; dy < sizeY; dy++) {
+                bbxkey[1] = torso_freebbxminkey[1] + dy;
+                for (int dz = 0; dz < sizeZ; dz++) {
+                    bbxkey[2] = torso_freebbxminkey[2] + dz;
+                    nbv_octree->updateNode(bbxkey, false, false);
+                }
+            }
+        }
+    }
+
     ROS_INFO("Pre-defined free zone set!");
 
     /* Set neighbor directions for speckles check */
@@ -170,6 +215,11 @@ OctomapBuilder::OctomapBuilder(ros::NodeHandle nh, bool diffmap):
     occ_color.g = 0;
     occ_color.b = 0;
     occ_color.a = 1;
+
+    /* Set publisher of updating pointcloud */
+    updtPc_pub = m_nh.advertise<PCLPointCloud>("updating_pointcloud", 1);
+    /* Set publisher of filtered pointcloud */
+    filterPc_pub = m_nh.advertise<PCLPointCloud>("filtered_pointcloud", 1);
 
     /* Listen to pointcloud and convert it to octomap */
     m_pointCloudSub = new message_filters::Subscriber<sensor_msgs::PointCloud2> (m_nh, m_pointCloudTopic, 1);
@@ -205,7 +255,7 @@ void OctomapBuilder::insertCloudCallback(const sensor_msgs::PointCloud2::ConstPt
     pcl_ros::transformAsMatrix(sensorToWorldTf, sensorToWorld);
     pcl::transformPointCloud(pc, pc, sensorToWorld);
     /* Set up filter for pointcloud. Filter out points not in the interested bounding box, and also remove the NAN points */
-    pcl::PassThrough<pcl::PointXYZ> pass;
+    /*pcl::PassThrough<pcl::PointXYZ> pass;
     pass.setInputCloud(pc.makeShared());
     pass.setFilterFieldName("x");
     pass.setFilterLimits(m_pointcloudMinX, m_pointcloudMaxX);
@@ -215,7 +265,7 @@ void OctomapBuilder::insertCloudCallback(const sensor_msgs::PointCloud2::ConstPt
     pass.filter(pc);
     pass.setFilterFieldName("z");
     pass.setFilterLimits(m_pointcloudMinZ, m_pointcloudMaxZ);
-    pass.filter(pc);
+    pass.filter(pc);*/
     //ROS_INFO("Filtered pointcloud size is %lu", pc.size());
 
     double total_elapsed = (ros::WallTime::now() - startTime).toSec();
@@ -323,18 +373,28 @@ void OctomapBuilder::insertClouddiffCallback(const sensor_msgs::PointCloud2::Con
     pcl_ros::transformAsMatrix(sensorToWorldTf, sensorToWorld);
     pcl::transformPointCloud(pc, pc, sensorToWorld);
     /* Set up filter for pointcloud. Filter out points not in the interested bounding box, and also remove the NAN points */
-    pcl::PassThrough<pcl::PointXYZ> pass;
+    /*pcl::PassThrough<pcl::PointXYZ> pass;
     pass.setInputCloud(pc.makeShared());
     pass.setFilterFieldName("x");
     pass.setFilterLimits(m_pointcloudMinX, m_pointcloudMaxX);
     pass.filter(pc);
+    pass.setInputCloud(pc.makeShared());
     pass.setFilterFieldName("y");
     pass.setFilterLimits(m_pointcloudMinY, m_pointcloudMaxY);
     pass.filter(pc);
+    pass.setInputCloud(pc.makeShared());
     pass.setFilterFieldName("z");
     pass.setFilterLimits(m_pointcloudMinZ, m_pointcloudMaxZ);
-    pass.filter(pc);
+    pass.filter(pc);*/
     //ROS_INFO("Filtered pointcloud size is %lu", pc.size());
+    /* Publish filtered pointcloud for checking the filter outcome*/
+    std::vector<int> map_index;
+    pcl::removeNaNFromPointCloud(pc, pc, map_index);
+    sensor_msgs::PointCloud2 temp_pc;
+    temp_pc.header.frame_id = m_worldFrameId;
+    temp_pc.header.stamp = ros::Time::now();
+    pc.header = pcl_conversions::toPCL(temp_pc.header);
+    filterPc_pub.publish(pc);
 
     double total_elapsed = (ros::WallTime::now() - startTime).toSec();
     //ROS_INFO("Pointcloud was filtered in %f sec.", total_elapsed);
@@ -358,7 +418,7 @@ void OctomapBuilder::insertScandiff(const tf::Point& sensorOriginTf, const PCLPo
     for (PCLPointCloud::const_iterator it = input_pc.begin(); it != input_pc.end(); ++it)
     {
         octomap::point3d point(it->x, it->y, it->z);
-        // max_range check
+        /* max_range check */
         if ((m_maxRange < 0.0) || (point - sensorOrigin).norm() <= m_maxRange) {
             /* Calculate free cells along each ray */
             if (nbv_octree->computeRayKeys(sensorOrigin, point, m_keyRay)) {
@@ -378,10 +438,17 @@ void OctomapBuilder::insertScandiff(const tf::Point& sensorOriginTf, const PCLPo
             }
         }
     }
-    /* Mark free cells only if not seen occupied in this cloud */
+
     for (octomap::KeySet::iterator it = free_cells.begin(); it != free_cells.end(); ++it)
     {
         if (occupied_cells.find(*it) == occupied_cells.end()) {
+            if (!nbv_octree->search(*it)
+            && (*it)[0] > m_allbbxminkey[0] && (*it)[1] > m_allbbxminkey[1] && (*it)[2] > m_allbbxminkey[2]
+            && (*it)[0] < m_allbbxmaxkey[0] && (*it)[1] < m_allbbxmaxkey[1] && (*it)[2] < m_allbbxmaxkey[2]) {
+
+                /* updating pointcloud */
+                updt_pc.push_back(octomap::pointOctomapToPCL<pcl::PointXYZ>(nbv_octree->keyToCoord(*it)));
+            }
             nbv_octree->updateNode(*it, false);
             mp_octree->updateNode(*it, false);
         }
@@ -389,6 +456,12 @@ void OctomapBuilder::insertScandiff(const tf::Point& sensorOriginTf, const PCLPo
     /* Mark all occupied cells */
     for (octomap::KeySet::iterator it = occupied_cells.begin(); it != occupied_cells.end(); ++it)
     {
+        if (!nbv_octree->search(*it)
+            && (*it)[0] > m_allbbxminkey[0] && (*it)[1] > m_allbbxminkey[1] && (*it)[2] > m_allbbxminkey[2]
+            && (*it)[0] < m_allbbxmaxkey[0] && (*it)[1] < m_allbbxmaxkey[1] && (*it)[2] < m_allbbxmaxkey[2]) {
+            /* updating pointcloud */
+            updt_pc.push_back(octomap::pointOctomapToPCL<pcl::PointXYZ>(nbv_octree->keyToCoord(*it)));
+        }
         nbv_octree->updateNode(*it, true);
         mp_octree->updateNode(*it, true);
     }
@@ -463,11 +536,17 @@ void OctomapBuilder::publishAlldiff(const ros::Time& rostime)
     nbv_occ_pub.publish(nbv_occNodesVis);
     mp_free_pub.publish(mp_freeNodesVis);
     mp_occ_pub.publish(mp_occNodesVis);
+    /* Set header of pointcloud */
+    sensor_msgs::PointCloud2 temp_pc;
+    temp_pc.header.frame_id = m_worldFrameId;
+    temp_pc.header.stamp = ros::Time::now();
+    updt_pc.header = pcl_conversions::toPCL(temp_pc.header);
+    updtPc_pub.publish(updt_pc);
 }
 
 void OctomapBuilder::start()
 {
-    ros::Rate r(0.5);
+    ros::Rate r(1);
     while (ros::ok()) {
         ros::spinOnce();
         r.sleep();

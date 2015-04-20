@@ -55,20 +55,25 @@ void MPmapFilter::frontierExtraction(OcTree *octree)
     unsigned idx;
     /* Clear the frontier cell for each loop */
     frontier_cells.clear();
+    /* Threshold of occupancy */
+    float occ_log = 0.0;
 
     for (OcTree::leaf_iterator leaf_it = mp_octree->begin_leafs(); leaf_it != mp_octree->end_leafs(); leaf_it++)
     {
-        leaf_key = leaf_it.getKey();
-        idx = leaf_it.getDepth();
-        for (std::vector<OcTreeLUT::NeighborDirection>::iterator nb_dir_it = nb_dir.begin(); nb_dir_it != nb_dir.end(); nb_dir_it++)
-        {
-            lut.genNeighborKey(leaf_key, *nb_dir_it, nb_key);
-            if (!mp_octree->search(nb_key)) {
-                mp_octree->updateNode(leaf_key, true);
-                frontier_cells.push_back(leaf_key);
-                cubeCenter_frt = pointOctomapToMsg(mp_octree->keyToCoord(leaf_key));
-                frtNodesVis.markers[idx].points.push_back(cubeCenter_frt);
-                break;
+        /* Modification: frontier cells just include free cells */
+        if (leaf_it->getLogOdds() < occ_log) {
+            leaf_key = leaf_it.getKey();
+            idx = leaf_it.getDepth();
+            for (std::vector<OcTreeLUT::NeighborDirection>::iterator nb_dir_it = nb_dir.begin(); nb_dir_it != nb_dir.end(); nb_dir_it++)
+            {
+                lut.genNeighborKey(leaf_key, *nb_dir_it, nb_key);
+                if (!mp_octree->search(nb_key)) {
+                    mp_octree->updateNode(leaf_key, true);
+                    frontier_cells.push_back(leaf_key);
+                    cubeCenter_frt = pointOctomapToMsg(mp_octree->keyToCoord(leaf_key));
+                    frtNodesVis.markers[idx].points.push_back(cubeCenter_frt);
+                    break;
+                }
             }
         }
     }
@@ -107,6 +112,7 @@ void MPmapFilter::FrtNbvCandidates(OcTree *octree, point3d &origin)
     //ros::WallTime begin_extract = ros::WallTime::now();
     for (OcTree::leaf_iterator leaf_it = octree->begin_leafs(); leaf_it != octree->end_leafs(); ++leaf_it)
     {
+        // TODO define free cells with unknown neighbors as frontier cells
         leaf_key = leaf_it.getKey();
         if (leaf_key[0] > nbv_bbxminkey[0] && leaf_key[1] > nbv_bbxminkey[1] && leaf_key[2] < nbv_bbxmaxkey[2]
          && leaf_key[0] < nbv_bbxmaxkey[0] && leaf_key[1] < nbv_bbxmaxkey[1] && leaf_key[2] > nbv_bbxminkey[2])

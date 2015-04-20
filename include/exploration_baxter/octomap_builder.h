@@ -20,6 +20,7 @@
 #include <pcl_ros/transforms.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/filters/passthrough.h>
+#include <pcl_ros/point_cloud.h>
 
 #include <boost/thread.hpp>
 
@@ -78,6 +79,10 @@ class OctomapBuilder {
     ros::Publisher nbv_free_pub, nbv_occ_pub, mp_free_pub, mp_occ_pub;
     /* Colors for free and occupied markers */
     std_msgs::ColorRGBA free_color, occ_color;
+    /* Publisher of updating pointcloud */
+    ros::Publisher updtPc_pub;
+    /* Publisher of filtered pointcloud */
+    ros::Publisher filterPc_pub;
     /* Thread to start building octomap */
     boost::thread *build_thread;
 
@@ -99,6 +104,9 @@ class OctomapBuilder {
 
     public:
         OctomapBuilder(ros::NodeHandle nh, bool diffmap);
+
+        /* Updating pointcloud */
+        PCLPointCloud updt_pc;
         /*
          * @brief Start to collect data
          */

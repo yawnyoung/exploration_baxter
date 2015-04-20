@@ -2,25 +2,29 @@
 
 NBVStrategy::NBVStrategy(ros::NodeHandle nh):
     m_nh(nh),
-    lower_limit(0.5)            // Set default value to be 0.5 meter
+    lower_limit(0.5),            // Set default value to be 0.5 meter
+    m_WorldFrame("/base")        // Set default world frame to be base frame
 {
     /* Get Parameter */
     m_nh.param("sensor_model/lower_limit", lower_limit, lower_limit);
+    m_nh.param("frame_id", m_WorldFrame, m_WorldFrame);
     /* Set publisher of visual normals */
     normal_pub = m_nh.advertise<visualization_msgs::MarkerArray>("normals", 1);
     /* Listen to transformation of sensor frame relative to right hand camera frame */
     tf::TransformListener m_tfListener;             // TF listener
     tf::StampedTransform sensorToRhcTf;
     try {
+        m_tfListener.waitForTransform("/right_hand_camera", "/camera_rgb_optical_frame", ros::Time::now(), ros::Duration(3.0));
         m_tfListener.lookupTransform("/right_hand_camera", "/camera_rgb_optical_frame", ros::Time(0), sensorToRhcTf);
     } catch (tf::TransformException &ex) {
+        ROS_ERROR("%s", ex.what());
         ROS_ERROR("Can't get transformation of sensor frame relative to right_hand_camera frame ");
     }
     /* Convert the tf transform into a Eigen Affine3d */
     tf::transformTFToEigen(sensorToRhcTf, TsensorTorhc);
 };
 
-void NBVStrategy::FrtNearTracker(PointCloud &cloud, DistPoints &distpoints, int &cand_num, octomap::point3d origin)
+void NBVStrategy::FrtNearTracker(PointCloud &cloud, DistPoints &distpoints, int &cand_num, octomap::point3d origin, geometry_msgs::Pose last_view, float portion)
 {
     /* Temporary point pairs assignment */
     DistPoints temp_distpt(distpoints);
@@ -41,12 +45,12 @@ void NBVStrategy::FrtNearTracker(PointCloud &cloud, DistPoints &distpoints, int 
     normalVis.markers.resize(cand_num);                               // Resize normal marker array
     /* Select top N (cand_num) nearest frontier */
     unsigned int num_distpt(temp_distpt.size());       // Number of frontier point pairs
-    unsigned int step = 0.3 * num_distpt / cand_num;   // Top 30% points divided by candidate number
+    unsigned int step = portion * num_distpt / cand_num;   // Top 30% points divided by candidate number
     nbvCands.clear();                                     // Clear next views
     nbvCands.resize(cand_num);                            // Set next views size as candidate number
     for (int i = 0; i < cand_num; i++) {
         octomap::point3d near_frt = temp_distpt[step * i].first;                    // Near frontier point
-        nbvCands[i].position = octomap::pointOctomapToMsg(near_frt);                // Assign near frontier point to position candidate
+        nbvCands[i].pose.position = octomap::pointOctomapToMsg(near_frt);                // Assign near frontier point to position candidate
         /* Normal estimation at this point */
         pcl::PointXYZ near_frt_pcl(near_frt.x(), near_frt.y(), near_frt.z());       // Convert octomap point to pcl point
         std::vector<int> pointIdxNKNSearch(k);                                      // the resultant indicies of the neighboring points
@@ -64,10 +68,18 @@ void NBVStrategy::FrtNearTracker(PointCloud &cloud, DistPoints &distpoints, int 
             }
             normal.normalize();                                                                         // Normalize vector
             /* Calculate position candidate */
-            Eigen::Vector3f position_cand = frt - lower_limit * normal;
-            nbvCands[i].position.x = position_cand.x();
-            nbvCands[i].position.y = position_cand.y();
-            nbvCands[i].position.z = position_cand.z();
+            Eigen::Vector3f position_cand;
+            position_cand = frt - lower_limit * normal;
+            if (std::abs(last_view.position.x - position_cand.x()) <= 0.02 &&
+                std::abs(last_view.position.y - position_cand.y()) <= 0.02 &&
+                std::abs(last_view.position.z - position_cand.z()) <= 0.02) {
+                position_cand =  frt - 0.5 * normal;
+                ROS_INFO("Consider sensor lower limit");
+            }
+            nbvCands[i].header.frame_id = m_WorldFrame;
+            nbvCands[i].pose.position.x = position_cand.x();
+            nbvCands[i].pose.position.y = position_cand.y();
+            nbvCands[i].pose.position.z = position_cand.z();
             /* Normal for visualization*/
             Eigen::Vector3f vis_orient_identity(1, 0, 0);                                               // Identity orientation in RVIZ
             Eigen::Quaternion<float> vis_orient;                                                        // Quaternion for visualization
@@ -77,28 +89,28 @@ void NBVStrategy::FrtNearTracker(PointCloud &cloud, DistPoints &distpoints, int 
             normalVis.markers[i].pose.orientation.y = vis_orient.y();
             normalVis.markers[i].pose.orientation.z = vis_orient.z();
             normalVis.markers[i].pose.orientation.w = vis_orient.w();
-            normalVis.markers[i].pose.position = nbvCands[i].position;
+            normalVis.markers[i].pose.position = nbvCands[i].pose.position;
             /* Normal for motion planning */
             Eigen::Vector3f mp_orient_identity(0, 0, 1);                                                // Calculate rotation transformation between z axes
             Eigen::Quaternion<float> mp_orient;                                                         // Quaternion for motion planning
             mp_orient.setFromTwoVectors(mp_orient_identity, normal);
-            nbvCands[i].orientation.x = mp_orient.x();
-            nbvCands[i].orientation.y = mp_orient.y();
-            nbvCands[i].orientation.z = mp_orient.z();
-            nbvCands[i].orientation.w = mp_orient.w();
+            nbvCands[i].pose.orientation.x = mp_orient.x();
+            nbvCands[i].pose.orientation.y = mp_orient.y();
+            nbvCands[i].pose.orientation.z = mp_orient.z();
+            nbvCands[i].pose.orientation.w = mp_orient.w();
             /* OUTPUT TEST */
-            ROS_INFO_STREAM("Position - x: " << nbvCands[i].position.x
-                            << " y: " << nbvCands[i].position.y
-                            << " z: " << nbvCands[i].position.z);
-            ROS_INFO_STREAM("Orientation -x: " << nbvCands[i].orientation.x
-                            << " y: " << nbvCands[i].orientation.y
-                            << " z: " << nbvCands[i].orientation.z
-                            << " w: " << nbvCands[i].orientation.w);
-
+            /*
+            ROS_INFO_STREAM("Position - x: " << nbvCands[i].pose.position.x
+                            << " y: " << nbvCands[i].pose.position.y
+                            << " z: " << nbvCands[i].pose.position.z);
+            ROS_INFO_STREAM("Orientation -x: " << nbvCands[i].pose.orientation.x
+                            << " y: " << nbvCands[i].pose.orientation.y
+                            << " z: " << nbvCands[i].pose.orientation.z
+                            << " w: " << nbvCands[i].pose.orientation.w);*/
         }
     }
     /* Calculate right_hand_camera next pose */
-    RHCPose();
+    //RHCPose();
     /* Set color for visual normals */
     std_msgs::ColorRGBA normal_color;
     normal_color.r = 1;
@@ -111,8 +123,7 @@ void NBVStrategy::FrtNearTracker(PointCloud &cloud, DistPoints &distpoints, int 
     normal_scale.y = 0.04;
     normal_scale.z = 0.04;
     uint8_t normal_shape = visualization_msgs::Marker::ARROW;
-    std::string frame_id = "/base";
-    visualization::dispMkarr(normalVis, normal_shape, normal_color, normal_scale, frame_id);
+    visualization::dispMkarr(normalVis, normal_shape, normal_color, normal_scale, m_WorldFrame);
     normal_pub.publish(normalVis);
 }
 
@@ -120,6 +131,7 @@ void NBVStrategy::doSort(DistPoints &distpoints)
 {
     std::sort(distpoints.begin(), distpoints.end(), comp_dist(*this));
 }
+
 
 void NBVStrategy::RHCPose()
 {
@@ -132,12 +144,16 @@ void NBVStrategy::RHCPose()
         /* Pose candidate for sensor in Eigen matrix */
         Eigen::Affine3d nbvCand_eigen;
         /* Convert Pose message to Eigen Transform */
-        tf::poseMsgToEigen(nbvCands[i], nbvCand_eigen);
+        tf::poseMsgToEigen(nbvCands[i].pose, nbvCand_eigen);
         /* Pose candidate for right_hand_camera in Eigen matrix */
         Eigen::Affine3d RHCnbvCand_eigen;
         /* Calculate right_hand_camera pose */
         RHCnbvCand_eigen = nbvCand_eigen * TsensorTorhc.inverse();
         /* Convert Eigen pose to Message pose */
-        tf::poseEigenToMsg(RHCnbvCand_eigen, RHCnbvCands[i]);
+        tf::poseEigenToMsg(RHCnbvCand_eigen, RHCnbvCands[i].pose);
+        /* Assign pose header frame_id */
+        RHCnbvCands[i].header.frame_id = m_WorldFrame;
+        /* Data validation test */
+        //ROS_INFO_STREAM("Frame id is: " << RHCnbvCands[i].header.frame_id);
     }
 }
