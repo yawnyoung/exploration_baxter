@@ -113,6 +113,8 @@ void MPmapFilter::FrtNbvCandidates(OcTree *octree, point3d &origin)
     for (OcTree::leaf_iterator leaf_it = octree->begin_leafs(); leaf_it != octree->end_leafs(); ++leaf_it)
     {
         // TODO define free cells with unknown neighbors as frontier cells
+        if (!octree->isNodeOccupied(*leaf_it)) {
+
         leaf_key = leaf_it.getKey();
         if (leaf_key[0] > nbv_bbxminkey[0] && leaf_key[1] > nbv_bbxminkey[1] && leaf_key[2] < nbv_bbxmaxkey[2]
          && leaf_key[0] < nbv_bbxmaxkey[0] && leaf_key[1] < nbv_bbxmaxkey[1] && leaf_key[2] > nbv_bbxminkey[2])
@@ -131,6 +133,7 @@ void MPmapFilter::FrtNbvCandidates(OcTree *octree, point3d &origin)
                     break;
                 }
             }
+        }
         }
     }
     /* Test for publish frontier pointcloud */

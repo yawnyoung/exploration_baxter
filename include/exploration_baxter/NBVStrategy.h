@@ -39,6 +39,8 @@ class NBVStrategy {
     visualization_msgs::MarkerArray normalVis;
     /* Publisher of visual normals */
     ros::Publisher normal_pub;
+    /* End effector of plan instead of camera_rgb_optical_frame*/
+    std::string plan_eef;
     /* Transformation of sensor frame relative to right hand camera frame */
     Eigen::Affine3d TsensorTorhc;
 

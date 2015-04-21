@@ -29,6 +29,14 @@
         <joint name="right_hand" />
         <joint name="right_hand_camera" />
     </group>
+
+    <group name="right_fore_arm">
+        <joint name="right_s0" />
+        <joint name="right_s1" />
+        <joint name="right_e0" />
+        <joint name="right_e1" />
+    </group>
+
     <group name="both_arms">
         <group name="right_arm" />
         <group name="left_arm" />

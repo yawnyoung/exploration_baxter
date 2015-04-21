@@ -11,6 +11,7 @@ PlannerAction::PlannerAction(ros::NodeHandle nh):
 {
     /* Get Parameters */
     pa_nh.param("plan_group", plan_group, plan_group);
+    pa_nh.param("plan_endeffector", link_name, link_name);
 
     /* Create robot model and planning scene instance */
     robot_model = robot_model_loader.getModel();
@@ -179,7 +180,7 @@ void PlannerAction::motionPlan(viewsStamped &view_cand, octomap::OcTree *ot_map)
         }
     }
     if (res.error_code_.val != res.error_code_.SUCCESS) {
-        ROS_ERROR("Could not compute plan successfully");
+        ROS_ERROR_STREAM("Could not compute plan successfully: " << res.error_code_.val);
         plan_out = false;
     }
     else {
@@ -211,8 +212,9 @@ void PlannerAction::ActPlan()
     control_msgs::FollowJointTrajectoryGoal goal;
     /* Test trajectory points */
     int point_nb = res_msg.trajectory.joint_trajectory.points.size();
-    double move_time = 5.0;
-    ros::Duration step(move_time / point_nb);
+    //double move_time = 5.0;
+    //ros::Duration step(move_time / point_nb);
+    ros::Duration step(0.5);
     //res_msg.trajectory.joint_trajectory.points[1].time_from_start = move_time;
     ROS_INFO("The number of trajectory points is: %d", point_nb);
     goal.trajectory = res_msg.trajectory.joint_trajectory;

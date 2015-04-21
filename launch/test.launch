@@ -30,6 +30,10 @@
         <param name="torsofree_max_x" value="0.21" />
         <param name="sensor_model/max_range" value="1.5" />
         <param name="sensor_model/lower_limit" value = "0.2" />
+
+        <param name="plan_endeffector" value="camera_rgb_optical_frame" />
+        <param name="plan_group" value="right_arm" />
+
         <param name="publish_frontier" value="false" />
         <param name="planning_plugin" value="$(arg planning_plugin)" />
         <rosparam command="load" file="$(find baxter_moveit_config)/config/ompl_planning.yaml"/>

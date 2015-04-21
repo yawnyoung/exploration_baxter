@@ -2,23 +2,25 @@
 
 NBVStrategy::NBVStrategy(ros::NodeHandle nh):
     m_nh(nh),
-    lower_limit(0.5),            // Set default value to be 0.5 meter
-    m_WorldFrame("/base")        // Set default world frame to be base frame
+    lower_limit(0.5),                       // Set default value to be 0.5 meter
+    m_WorldFrame("/base"),                  // Set default world frame to be base frame
+    plan_eef("/right_hand_camera")          // Set default plan end effector to be right_hand_camera
 {
     /* Get Parameter */
     m_nh.param("sensor_model/lower_limit", lower_limit, lower_limit);
     m_nh.param("frame_id", m_WorldFrame, m_WorldFrame);
+    //m_nh.param("plan_endeffector", plan_eef, plan_eef);
     /* Set publisher of visual normals */
     normal_pub = m_nh.advertise<visualization_msgs::MarkerArray>("normals", 1);
     /* Listen to transformation of sensor frame relative to right hand camera frame */
     tf::TransformListener m_tfListener;             // TF listener
     tf::StampedTransform sensorToRhcTf;
     try {
-        m_tfListener.waitForTransform("/right_hand_camera", "/camera_rgb_optical_frame", ros::Time::now(), ros::Duration(3.0));
-        m_tfListener.lookupTransform("/right_hand_camera", "/camera_rgb_optical_frame", ros::Time(0), sensorToRhcTf);
+        m_tfListener.waitForTransform(plan_eef, "/camera_rgb_optical_frame", ros::Time::now(), ros::Duration(3.0));
+        m_tfListener.lookupTransform(plan_eef, "/camera_rgb_optical_frame", ros::Time(0), sensorToRhcTf);
     } catch (tf::TransformException &ex) {
         ROS_ERROR("%s", ex.what());
-        ROS_ERROR("Can't get transformation of sensor frame relative to right_hand_camera frame ");
+        ROS_ERROR_STREAM("Can't get transformation of sensor frame relative to " << plan_eef << " frame");
     }
     /* Convert the tf transform into a Eigen Affine3d */
     tf::transformTFToEigen(sensorToRhcTf, TsensorTorhc);

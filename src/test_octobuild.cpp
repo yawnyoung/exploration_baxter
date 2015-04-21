@@ -45,6 +45,7 @@ int main(int argc, char** argv)
                     m_strategy.FrtNearTracker(map_filter.frt_pc, map_filter.cand_pair, num_cand, ot_builder.sensorOrigin, planner_action.last_view, cand_portion);
                 }
                 planner_action.motionPlan(m_strategy.nbvCands, ot_builder.mp_octree);
+                //planner_action.motionPlan(m_strategy.RHCnbvCands, ot_builder.mp_octree);
                 //}
                 if (!planner_action.plan_out) {
                     fail_count++;
