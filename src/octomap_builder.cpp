@@ -81,6 +81,9 @@ OctomapBuilder::OctomapBuilder(ros::NodeHandle nh, bool diffmap):
             sizeZ = m_allbbxmaxkey[2] - m_allbbxminkey[2] + 1;
             if (sizeX > 0 && sizeY > 0 && sizeZ > 0) {
                 ROS_INFO("Obtain whole zone range");
+                scan_space = sizeX * sizeY * sizeZ;
+                ROS_INFO_STREAM("The number of cells to be scanned is: " << scan_space);
+
             }
             else {
                 ROS_ERROR("Size should be larger than 0. Please check the input bounding box coordinates");
@@ -100,6 +103,25 @@ OctomapBuilder::OctomapBuilder(ros::NodeHandle nh, bool diffmap):
                     mp_octree->updateNode(bbxkey, occ_log, false);
                 }
             }
+        }
+
+        /* Calculate number of MP octree leaf nodes at different depths */
+        std::vector<int> num_leafnodes(m_treeDepth + 1, 0);
+        for (octomap::OcTree::leaf_iterator leaf_it = mp_octree->begin_leafs(); leaf_it != mp_octree->end_leafs(); ++leaf_it)
+        {
+            unsigned int leaf_depth(leaf_it.getDepth());
+            num_leafnodes[leaf_depth] += 1;
+        }
+
+        for (int i = 0; i < num_leafnodes.size(); ++i)
+        {
+            ROS_INFO_STREAM("Depth " << i << " has " << num_leafnodes[i] << " leafs");
+        }
+
+        /* Calculate node size at each depth */
+        for (int i = 0; i < m_treeDepth + 1; ++i)
+        {
+            ROS_INFO_STREAM("Node size at depth " << i << " is " << mp_octree->getNodeSize(i));
         }
     }
     else {
@@ -278,7 +300,7 @@ void OctomapBuilder::insertCloudCallback(const sensor_msgs::PointCloud2::ConstPt
     total_elapsed = (ros::WallTime::now() - startTime).toSec();
     ROS_INFO("Pointcloud insertion in OctomapBuilder done in %f sec.", total_elapsed);
     /* Publish display markers */
-    publishAll(cloud->header.stamp);
+    //publishAll(cloud->header.stamp);
 }
 
 void OctomapBuilder::insertScan(const tf::Point& sensorOriginTf, const PCLPointCloud& input_pc)

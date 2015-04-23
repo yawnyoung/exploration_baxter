@@ -18,23 +18,24 @@ int main(int argc, char **argv)
     jt_cmd.mode = 1;
 
     /* Middle */
-    /*
+
     jt_cmd.command.push_back(-0.767);
     jt_cmd.command.push_back(2.389);
     jt_cmd.command.push_back(-1.623);
     jt_cmd.command.push_back(-1.056);
     jt_cmd.command.push_back(-1.857);
     jt_cmd.command.push_back(-1.570);
-    jt_cmd.command.push_back(0.049);*/
+    jt_cmd.command.push_back(0.049);
 
     /* Right */
+    /*
     jt_cmd.command.push_back(-1.773);
     jt_cmd.command.push_back(2.172);
     jt_cmd.command.push_back(-0.560);
     jt_cmd.command.push_back(-1.420);
     jt_cmd.command.push_back(1.795);
     jt_cmd.command.push_back(-1.065);
-    jt_cmd.command.push_back(-1.521);
+    jt_cmd.command.push_back(-1.521);*/
 
     jt_cmd.names.push_back("right_e0");
     jt_cmd.names.push_back("right_e1");

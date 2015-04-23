@@ -13,6 +13,7 @@
 
 #include <pcl_ros/point_cloud.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl/kdtree/kdtree_flann.h>
 
 #include "exploration_baxter/visualization.h"
 
@@ -40,6 +41,10 @@ class MPmapFilter {
     OcTreeKey nbv_bbxminkey, nbv_bbxmaxkey;
     /* Publisher of frontier pointcloud */
     ros::Publisher frtPc_pub;
+    /* Publisher of real occupied pointcloud */
+    ros::Publisher occPc_pub;
+    /* Radius for void-frontier search */
+    double voidfrt_radius;
 
     /* A functor of comparator */
     struct comp_crit {
@@ -60,6 +65,11 @@ class MPmapFilter {
      */
     void doSort();
 
+    /**
+     * @brief Extract void-frontier
+     */
+    void voidfrtExtraction();
+
     public:
     OcTree *mp_octree;
     /* Cells labeled by frontier including occupied cells and free cells */
@@ -70,6 +80,10 @@ class MPmapFilter {
     std::vector<std::pair<point3d, double> > cand_pair;
     /* Frontier pointcloud */
     PointCloud frt_pc;
+    /* Real occupied pointcloud */
+    PointCloud occ_pc;
+    /* Proportion of void-frontier points to frontier points */
+    double voidfrt_frt;
 
     MPmapFilter(ros::NodeHandle nh, OcTreeKey bbxminkey, OcTreeKey bbxmaxkey);
     /**

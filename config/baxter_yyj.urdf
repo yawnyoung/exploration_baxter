@@ -512,7 +512,7 @@
         <collision>
             <origin rpy="0 0 0" xyz="0.024 0 0"/>
             <geometry>
-                <box size="0.18 0.03 0.025"/>
+                <box size="0.22 0.03 0.035"/>
             </geometry>
         </collision>
     </link>
@@ -679,7 +679,7 @@
         <child link="right_hand_camera"/>
     </joint>
     <joint name="camera_rgb_optical_frame" type="fixed">
-        <origin rpy="0.0745256 0.0039322 0.129185" xyz="0.000324725 -0.09238 0.0204097" />
+        <origin rpy="0.0758307 0.00234285 0.13389" xyz="-0.00139927 -0.0843446 0.0143339" />
         <parent link="right_hand_camera" />
         <child link="camera_rgb_optical_frame" />
     </joint>

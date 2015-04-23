@@ -6,12 +6,14 @@ PlannerAction::PlannerAction(ros::NodeHandle nh):
     pa_nh(nh),
     robot_model_loader("robot_description"),
     plan_group("right_arm"),                         // Set default planning group to be right_arm
+    m_planner_id("RRTstarkConfigDefault"),
     link_name("camera_rgb_optical_frame"),           // Set default planning link name to be right hand camera
     action_res(0)                                    // Set default value to be 0 in order to launch the first motion plan
 {
     /* Get Parameters */
     pa_nh.param("plan_group", plan_group, plan_group);
     pa_nh.param("plan_endeffector", link_name, link_name);
+    pa_nh.param("planner_id", m_planner_id, m_planner_id);
 
     /* Create robot model and planning scene instance */
     robot_model = robot_model_loader.getModel();
@@ -115,7 +117,7 @@ void PlannerAction::motionPlan(viewsStamped &view_cand, octomap::OcTree *ot_map)
     /* Motion plan request configuration */
     planning_interface::MotionPlanRequest req;
     req.group_name = plan_group;
-    req.planner_id = std::string("RRTstarkConfigDefault");
+    req.planner_id = m_planner_id;
     std::vector<double> tolerance_pose(3 , 0.01);           // Pose tolerance
     std::vector<double> tolerance_angle;                    // Angle tolerance
     tolerance_angle.push_back(0.01);
@@ -204,7 +206,7 @@ void PlannerAction::VisPlanpath()
     display_trajectory.trajectory.push_back(response.trajectory);
     display_pub.publish(display_trajectory);
 
-    sleep_time.sleep();
+    //sleep_time.sleep();
 }
 
 void PlannerAction::ActPlan()
@@ -214,7 +216,7 @@ void PlannerAction::ActPlan()
     int point_nb = res_msg.trajectory.joint_trajectory.points.size();
     //double move_time = 5.0;
     //ros::Duration step(move_time / point_nb);
-    ros::Duration step(0.5);
+    ros::Duration step(0.3);
     //res_msg.trajectory.joint_trajectory.points[1].time_from_start = move_time;
     ROS_INFO("The number of trajectory points is: %d", point_nb);
     goal.trajectory = res_msg.trajectory.joint_trajectory;

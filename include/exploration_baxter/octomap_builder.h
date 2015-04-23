@@ -107,6 +107,10 @@ class OctomapBuilder {
 
         /* Updating pointcloud */
         PCLPointCloud updt_pc;
+
+        /* Number of cells to be scanned */
+        unsigned int scan_space;
+
         /*
          * @brief Start to collect data
          */

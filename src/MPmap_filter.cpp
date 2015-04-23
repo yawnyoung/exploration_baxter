@@ -6,10 +6,12 @@ MPmapFilter::MPmapFilter(ros::NodeHandle nh, OcTreeKey bbxminkey, OcTreeKey bbxm
     mp_octree(NULL),
     nbv_bbxminkey(bbxminkey),
     nbv_bbxmaxkey(bbxmaxkey),
+    voidfrt_radius(0.1),   // Set default to be 10 cm
     isPublishFrt(true)      // Set default value to be true in order to publish frontier visualization cells by default
 {
     /* Get parameter */
     mp_nh.param("publish_frontier", isPublishFrt, isPublishFrt);
+    mp_nh.param("voidfrontier_radius", voidfrt_radius, voidfrt_radius);
     /* face directions */
     nb_dir.push_back(OcTreeLUT::W);
     nb_dir.push_back(OcTreeLUT::E);
@@ -22,6 +24,8 @@ MPmapFilter::MPmapFilter(ros::NodeHandle nh, OcTreeKey bbxminkey, OcTreeKey bbxm
     frt_pub = nh.advertise<visualization_msgs::MarkerArray>("marker_frt", 1);
     /* Set publisher of frontier pointcloud */
     frtPc_pub = nh.advertise<PointCloud>("frontier_pointcloud", 1);
+    /* Set publisher of real occupied pointcloud */
+    occPc_pub = nh.advertise<PointCloud>("occupied_pointcloud", 1);
     /* Set frontier cell color */
     frt_color.r = 1;
     frt_color.g = 1;
@@ -105,16 +109,17 @@ void MPmapFilter::FrtNbvCandidates(OcTree *octree, point3d &origin)
     double crit;
     /* Clear candidate pairs */
     cand_pair.clear();
-    /* Clear PCL pointcloud */
+    /* Clear PCL frontier pointcloud */
     frt_pc.clear();
+    /* Clear PCL occupied pointcloud */
+    occ_pc.clear();
 
     ROS_INFO_STREAM("X: " << origin.x() <<  " Y: " << origin.y() << " Z: " << origin.z());
     //ros::WallTime begin_extract = ros::WallTime::now();
     for (OcTree::leaf_iterator leaf_it = octree->begin_leafs(); leaf_it != octree->end_leafs(); ++leaf_it)
     {
-        // TODO define free cells with unknown neighbors as frontier cells
+        /* For free cells extract frontier */
         if (!octree->isNodeOccupied(*leaf_it)) {
-
         leaf_key = leaf_it.getKey();
         if (leaf_key[0] > nbv_bbxminkey[0] && leaf_key[1] > nbv_bbxminkey[1] && leaf_key[2] < nbv_bbxmaxkey[2]
          && leaf_key[0] < nbv_bbxmaxkey[0] && leaf_key[1] < nbv_bbxmaxkey[1] && leaf_key[2] > nbv_bbxminkey[2])
@@ -135,6 +140,11 @@ void MPmapFilter::FrtNbvCandidates(OcTree *octree, point3d &origin)
             }
         }
         }
+        /* Convert occupied cells to pointcloud */
+        else {
+            point3d occ_point = octree->keyToCoord(leaf_it.getKey());
+            occ_pc.push_back(pcl::PointXYZ(occ_point.x(), occ_point.y(), occ_point.z()));
+        }
     }
     /* Test for publish frontier pointcloud */
     PointCloud::Ptr msg_pc(new PointCloud);
@@ -143,6 +153,9 @@ void MPmapFilter::FrtNbvCandidates(OcTree *octree, point3d &origin)
     temp_pc.header.stamp = ros::Time::now();
     frt_pc.header = pcl_conversions::toPCL(temp_pc.header);
     frtPc_pub.publish(frt_pc);
+    occ_pc.header = pcl_conversions::toPCL(temp_pc.header);
+    occPc_pub.publish(occ_pc);
+    voidfrtExtraction();
 }
 
 void MPmapFilter::mpPublishAll(const ros::Time &rostime)
@@ -161,4 +174,28 @@ double MPmapFilter::Dist_FrtOrg(point3d &frt, point3d &org)
 void MPmapFilter::doSort()
 {
     std::sort(cand_pair.begin(), cand_pair.end(), comp_crit(*this));
+}
+
+void MPmapFilter::voidfrtExtraction()
+{
+    /* Pointer to occupied pointcloud */
+    PointCloud::Ptr occPc_ptr(new PointCloud(occ_pc));
+    /* Build KdTree for occupied pointcloud */
+    pcl::KdTreeFLANN<pcl::PointXYZ> occ_kdtree;
+    occ_kdtree.setInputCloud(occPc_ptr);
+    /* Number of void-frontier points */
+    unsigned int num_voidfrt = 0;
+    /* Extract void-frontier if it has occupied neighbors in r m */
+    for (PointCloud::iterator pc_it = frt_pc.begin(); pc_it != frt_pc.end(); ++pc_it)
+    {
+        std::vector<int> indices;
+        std::vector<float> sqr_dists;
+        /* Search occupied neighbors within radius search */
+        if (occ_kdtree.radiusSearch(*pc_it, voidfrt_radius, indices, sqr_dists) > 5) {
+            ++num_voidfrt;
+        }
+    }
+    /* Calculate the proportion of void-frontier points to frontier points */
+    voidfrt_frt = double(num_voidfrt) / double(frt_pc.size());
+
 }

@@ -48,6 +48,8 @@ class PlannerAction {
     std::string planner_plugin_name;
     /* Motion plan group */
     std::string plan_group;
+    /* Planner ID */
+    std::string m_planner_id;
     /* Planning link name */
     std::string link_name;
     /* Subscriber for listening to current robot state */
