@@ -76,17 +76,14 @@ class OctomapBuilder {
     std::vector<octomap::OcTreeLUT::NeighborDirection> nb_dir;
 
     /* Publisher of free and occupied markers */
-    ros::Publisher nbv_free_pub, nbv_occ_pub, mp_free_pub, mp_occ_pub;
+    ros::Publisher nbv_occ_pub;
     /* Colors for free and occupied markers */
     std_msgs::ColorRGBA free_color, occ_color;
     /* Publisher of updating pointcloud */
     ros::Publisher updtPc_pub;
-    /* Publisher of filtered pointcloud */
-    ros::Publisher filterPc_pub;
     /* Thread to start building octomap */
     boost::thread *build_thread;
 
-    virtual void insertCloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud);
     virtual void insertClouddiffCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud);
     virtual void specklesfilter();
 
@@ -97,19 +94,20 @@ class OctomapBuilder {
      * @param sensorOrigin origin of the measurements for raytracing
      * @param input_pc the pointcloud as input
      */
-    virtual void insertScan(const tf::Point& sensorOriginTf, const PCLPointCloud& input_pc);
     virtual void insertScandiff(const tf::Point& sensorOriginTf, const PCLPointCloud& input_pc);
-    void publishAll(const ros::Time& rostime);
     void publishAlldiff(const ros::Time& rostime);
 
     public:
-        OctomapBuilder(ros::NodeHandle nh, bool diffmap);
+        OctomapBuilder(ros::NodeHandle nh);
 
         /* Updating pointcloud */
         PCLPointCloud updt_pc;
 
         /* Number of cells to be scanned */
         unsigned int scan_space;
+
+        /* Size of inserted pointcloud */
+        unsigned int size_insert;
 
         /*
          * @brief Start to collect data

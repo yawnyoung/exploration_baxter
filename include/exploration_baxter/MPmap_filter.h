@@ -43,6 +43,8 @@ class MPmapFilter {
     ros::Publisher frtPc_pub;
     /* Publisher of real occupied pointcloud */
     ros::Publisher occPc_pub;
+    /* Publisher of void-frontier pointcloud */
+    ros::Publisher voidfrtPc_pub;
     /* Radius for void-frontier search */
     double voidfrt_radius;
 
@@ -78,10 +80,14 @@ class MPmapFilter {
     std::vector<geometry_msgs::Point> cand_positions;
     /* A set of pairs including frontier point and its corresponding criterion function value */
     std::vector<std::pair<point3d, double> > cand_pair;
+    /* A set of pairs including frontier point and its unknown neighbor */
+    std::vector<std::pair<point3d, point3d> > frt_unknown;
     /* Frontier pointcloud */
     PointCloud frt_pc;
     /* Real occupied pointcloud */
     PointCloud occ_pc;
+    /* Void-frontier pointcloud */
+    PointCloud voidfrt_pc;
     /* Proportion of void-frontier points to frontier points */
     double voidfrt_frt;
 

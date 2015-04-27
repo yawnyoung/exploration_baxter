@@ -26,6 +26,8 @@ MPmapFilter::MPmapFilter(ros::NodeHandle nh, OcTreeKey bbxminkey, OcTreeKey bbxm
     frtPc_pub = nh.advertise<PointCloud>("frontier_pointcloud", 1);
     /* Set publisher of real occupied pointcloud */
     occPc_pub = nh.advertise<PointCloud>("occupied_pointcloud", 1);
+    /* Set publisher of void-frontier pointcloud */
+    voidfrtPc_pub = nh.advertise<PointCloud>("voidfrontier_pointcloud", 1);
     /* Set frontier cell color */
     frt_color.r = 1;
     frt_color.g = 1;
@@ -109,6 +111,8 @@ void MPmapFilter::FrtNbvCandidates(OcTree *octree, point3d &origin)
     double crit;
     /* Clear candidate pairs */
     cand_pair.clear();
+    /* Clear frontier_unknown neighbor pairs */
+    frt_unknown.clear();
     /* Clear PCL frontier pointcloud */
     frt_pc.clear();
     /* Clear PCL occupied pointcloud */
@@ -129,10 +133,13 @@ void MPmapFilter::FrtNbvCandidates(OcTree *octree, point3d &origin)
                 lut.genNeighborKey(leaf_key, *nb_dir_it, nb_key);
                 if (!octree->search(nb_key)) {
                     frt_point = octree->keyToCoord(leaf_key);
+                    point3d nb_pt = octree->keyToCoord(nb_key);
                     /* Calculate the distance between frontier point and sensor origin */
                     crit = Dist_FrtOrg(frt_point, origin);
                     std::pair<point3d, double> m_pair = std::make_pair(frt_point, crit);
                     cand_pair.push_back(m_pair);
+                    /* Insert the frontier_unknown pairs */
+                    frt_unknown.push_back(std::make_pair(frt_point, nb_pt));
                     /* Convert octomap points into pointcloud2 for normal estimation */
                     frt_pc.push_back(pcl::PointXYZ(frt_point.x(), frt_point.y(), frt_point.z()));
                     break;
@@ -156,6 +163,8 @@ void MPmapFilter::FrtNbvCandidates(OcTree *octree, point3d &origin)
     occ_pc.header = pcl_conversions::toPCL(temp_pc.header);
     occPc_pub.publish(occ_pc);
     voidfrtExtraction();
+    voidfrt_pc.header = pcl_conversions::toPCL(temp_pc.header);
+    voidfrtPc_pub.publish(voidfrt_pc);
 }
 
 void MPmapFilter::mpPublishAll(const ros::Time &rostime)
@@ -185,6 +194,8 @@ void MPmapFilter::voidfrtExtraction()
     occ_kdtree.setInputCloud(occPc_ptr);
     /* Number of void-frontier points */
     unsigned int num_voidfrt = 0;
+    /* Clear void-frontier pointcloud */
+    voidfrt_pc.clear();
     /* Extract void-frontier if it has occupied neighbors in r m */
     for (PointCloud::iterator pc_it = frt_pc.begin(); pc_it != frt_pc.end(); ++pc_it)
     {
@@ -193,6 +204,7 @@ void MPmapFilter::voidfrtExtraction()
         /* Search occupied neighbors within radius search */
         if (occ_kdtree.radiusSearch(*pc_it, voidfrt_radius, indices, sqr_dists) > 5) {
             ++num_voidfrt;
+            voidfrt_pc.push_back(*pc_it);
         }
     }
     /* Calculate the proportion of void-frontier points to frontier points */

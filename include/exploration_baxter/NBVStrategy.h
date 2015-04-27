@@ -24,6 +24,7 @@
 
 typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
 typedef std::vector<std::pair<octomap::point3d, double> > DistPoints;
+typedef std::vector<std::pair<octomap::point3d, octomap::point3d> > FrtNb;
 typedef std::vector<geometry_msgs::Pose> views;
 typedef std::vector<geometry_msgs::PoseStamped> viewsStamped;
 
@@ -31,8 +32,7 @@ class NBVStrategy {
 
     /* ros nodehandle */
     ros::NodeHandle m_nh;
-    /* Lower limit of sensor in meter */
-    double lower_limit;
+
     /* World reference frame */
     std::string m_WorldFrame;
     /* Visualization makers for normals */
@@ -65,21 +65,38 @@ class NBVStrategy {
         }
     };
 
+    /* Find neighbor function */
+    struct find_nb{
+        const NBVStrategy& m_strategy;
+        octomap::point3d frontier_;
+        find_nb(const NBVStrategy& strategy, const octomap::point3d& frontier):
+            m_strategy(strategy),
+            frontier_(frontier)
+        { }
+        bool operator()(std::pair<octomap::point3d, octomap::point3d> const& p)
+        {
+            return (p.first == frontier_);
+        }
+    };
+
     public:
 
-        /* Next best view candidates including position and orientation */
-        //views nbvCands;
-        /* Modify type of nbvCands */
-        viewsStamped nbvCands;
-        /* Next best view candidates including position and orientation for right hand camera */
-        viewsStamped RHCnbvCands;
+    /* Next best view candidates including position and orientation */
+    //views nbvCands;
+    /* Modify type of nbvCands */
+    viewsStamped nbvCands;
+    /* Next best view candidates including position and orientation for right hand camera */
+    viewsStamped RHCnbvCands;
 
-        NBVStrategy(ros::NodeHandle nh);
+    NBVStrategy(ros::NodeHandle nh);
 
-        /**
-         * @brief Strategy to track the nearest frontier point
-         * @input Frontier pointcloud; frontier points with distance to sensor origin; number of candidates; sensor origin; Top portion of frontier points considered to be candidates
-         * @output Next view candidates including position and orientation
-         */
-        void FrtNearTracker(PointCloud &cloud, DistPoints &distpoints, int &cand_num, octomap::point3d origin, geometry_msgs::Pose last_view, float portion);
+    /* Lower limit of sensor in meter */
+    double lower_limit;
+
+    /**
+     * @brief Strategy to track the nearest frontier point
+     * @input Frontier pointcloud; frontier points with distance to sensor origin; number of candidates; sensor origin; Top portion of frontier points considered to be candidates
+     * @output Next view candidates including position and orientation
+     */
+    void FrtNearTracker(PointCloud &cloud, DistPoints &distpoints, int &cand_num, octomap::point3d origin, geometry_msgs::Pose last_view, float portion, FrtNb frt_nb);
 };

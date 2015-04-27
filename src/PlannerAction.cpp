@@ -118,10 +118,10 @@ void PlannerAction::motionPlan(viewsStamped &view_cand, octomap::OcTree *ot_map)
     planning_interface::MotionPlanRequest req;
     req.group_name = plan_group;
     req.planner_id = m_planner_id;
-    std::vector<double> tolerance_pose(3 , 0.01);           // Pose tolerance
+    std::vector<double> tolerance_pose(3 , 0.02);           // Pose tolerance
     std::vector<double> tolerance_angle;                    // Angle tolerance
-    tolerance_angle.push_back(0.01);
-    tolerance_angle.push_back(0.01);
+    tolerance_angle.push_back(PI / 12);
+    tolerance_angle.push_back(PI / 12);
     tolerance_angle.push_back(2 * PI);
     //req.goal_constraints.clear();                           // Clear last requests
     int fail_count = 0;
@@ -214,15 +214,43 @@ void PlannerAction::ActPlan()
     control_msgs::FollowJointTrajectoryGoal goal;
     /* Test trajectory points */
     int point_nb = res_msg.trajectory.joint_trajectory.points.size();
-    //double move_time = 5.0;
+    double step_time = 0.3;
     //ros::Duration step(move_time / point_nb);
-    ros::Duration step(0.3);
+    ros::Duration step(step_time);
     //res_msg.trajectory.joint_trajectory.points[1].time_from_start = move_time;
     ROS_INFO("The number of trajectory points is: %d", point_nb);
     goal.trajectory = res_msg.trajectory.joint_trajectory;
     goal.trajectory.header.stamp = ros::Time::now();
     for (int i = 0; i < point_nb; i++) {
         goal.trajectory.points[i].time_from_start = step * (i + 1);
+    }
+    /* Set velocities at each trajectory point */
+    std::vector<double> curr_joints;                    // Current joint positions
+    curr_joints.push_back(robotstate_crr.joint_state.position[2]);
+    curr_joints.push_back(robotstate_crr.joint_state.position[3]);
+    curr_joints.push_back(robotstate_crr.joint_state.position[0]);
+    curr_joints.push_back(robotstate_crr.joint_state.position[1]);
+    curr_joints.push_back(robotstate_crr.joint_state.position[4]);
+    curr_joints.push_back(robotstate_crr.joint_state.position[5]);
+    curr_joints.push_back(robotstate_crr.joint_state.position[6]);
+
+    Eigen::MatrixXd AvgVel_mat(7, point_nb);                // Average velocity matrix
+    Eigen::VectorXd AvgVel_col(7);                             // Average velocity column
+    for (int i = 0; i < 7; i++) {
+        AvgVel_col[i] = (goal.trajectory.points[0].positions[i] - curr_joints[i]) / step_time;
+    }
+    AvgVel_mat.col(0) = AvgVel_col;
+    for (int i = 1; i < point_nb; i++) {
+        for (int j = 0; j < 7; j++) {
+            AvgVel_col[j] = (goal.trajectory.points[i].positions[j] - goal.trajectory.points[i-1].positions[j]) / step_time;
+        }
+        AvgVel_mat.col(i) = AvgVel_col;
+    }
+
+    for (int i = 0; i < (point_nb - 1); i++) {
+        for (int j = 0; j < 7; j++) {
+            goal.trajectory.points[i].velocities[j] = (AvgVel_mat(j, i) + AvgVel_mat(j, i+1))/2;
+        }
     }
 
     traj_client->sendGoal(goal);

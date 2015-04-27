@@ -26,7 +26,7 @@ NBVStrategy::NBVStrategy(ros::NodeHandle nh):
     tf::transformTFToEigen(sensorToRhcTf, TsensorTorhc);
 };
 
-void NBVStrategy::FrtNearTracker(PointCloud &cloud, DistPoints &distpoints, int &cand_num, octomap::point3d origin, geometry_msgs::Pose last_view, float portion)
+void NBVStrategy::FrtNearTracker(PointCloud &cloud, DistPoints &distpoints, int &cand_num, octomap::point3d origin, geometry_msgs::Pose last_view, float portion, FrtNb frt_nb)
 {
     /* Temporary point pairs assignment */
     DistPoints temp_distpt(distpoints);
@@ -52,6 +52,8 @@ void NBVStrategy::FrtNearTracker(PointCloud &cloud, DistPoints &distpoints, int 
     nbvCands.resize(cand_num);                            // Set next views size as candidate number
     for (int i = 0; i < cand_num; i++) {
         octomap::point3d near_frt = temp_distpt[step * i].first;                    // Near frontier point
+        FrtNb::iterator it = std::find_if(frt_nb.begin(), frt_nb.end(), find_nb(*this, near_frt));
+        octomap::point3d frt_nb(it->second);
         nbvCands[i].pose.position = octomap::pointOctomapToMsg(near_frt);                // Assign near frontier point to position candidate
         /* Normal estimation at this point */
         pcl::PointXYZ near_frt_pcl(near_frt.x(), near_frt.y(), near_frt.z());       // Convert octomap point to pcl point
@@ -65,8 +67,14 @@ void NBVStrategy::FrtNearTracker(PointCloud &cloud, DistPoints &distpoints, int 
             Eigen::Vector3f frt(near_frt.x(), near_frt.y(), near_frt.z());                              // Convert nearest frontier point from octomap::point3d to Eigen::Vector3f
             Eigen::Vector3f origin_frt(frt - sensorOrigin);
             /* Flip normal if normal directs to inner space*/
-            if (normal.dot(origin_frt) < 0) {
+            /*if (normal.dot(origin_frt) < 0) {
                 normal= normal * -1;
+            }*/
+            /* Flip normal if normal directs to known space */
+            Eigen::Vector3f frtnb_eig(frt_nb.x(), frt_nb.y(), frt_nb.z());
+            Eigen::Vector3f frt_unkn(frtnb_eig - frt);
+            if (normal.dot(frt_unkn) < 0) {
+                normal = normal * -1;
             }
             normal.normalize();                                                                         // Normalize vector
             /* Calculate position candidate */
