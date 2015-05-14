@@ -54,6 +54,9 @@ class OctomapBuilder {
 
     /* Minimum and maximum values along each axis */
     double m_pointcloudMinX, m_pointcloudMaxX, m_pointcloudMinY, m_pointcloudMaxY, m_pointcloudMinZ, m_pointcloudMaxZ;
+    /* Pre-defined free zone bounding box keys */
+    octomap::OcTreeKey m_freebbxminkey, m_freebbxmaxkey;
+    octomap::OcTreeKey torso_freebbxminkey, torso_freebbxmaxkey;
     /* The maximum range for each ray */
     double m_maxRange;
     /* Temp storage for ray casting */

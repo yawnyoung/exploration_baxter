@@ -295,7 +295,7 @@
         <collision>
             <origin rpy="0 0 0" xyz="0 0 0.1361"/>
             <geometry>
-                <cylinder length="0.2722" radius="0.06"/>
+                <cylinder length="0.43" radius="0.08"/>
             </geometry>
         </collision>
         <inertial>
@@ -317,7 +317,7 @@
         <collision>
             <origin rpy="0 0 0" xyz="0 0 0"/>
             <geometry>
-                <cylinder length="0.22" radius="0.08"/>
+                <cylinder length="0.25" radius="0.15"/>
             </geometry>
         </collision>
         <inertial>
@@ -679,7 +679,7 @@
         <child link="right_hand_camera"/>
     </joint>
     <joint name="camera_rgb_optical_frame" type="fixed">
-        <origin rpy="0.136204 0.013331 0.0674753" xyz="-0.0100727 -0.0809104 0.0183719" />
+        <origin rpy="0.178573 -0.00506743 0.0677429" xyz="-0.00485757 -0.0810587 0.0164881" />
         <parent link="right_hand_camera" />
         <child link="camera_rgb_optical_frame" />
     </joint>
@@ -729,7 +729,7 @@
         <collision>
             <origin rpy="0 0 0" xyz="0 0 0.1361"/>
             <geometry>
-                <cylinder length="0.2722" radius="0.06"/>
+                <cylinder length="0.2722" radius="0.08"/>
             </geometry>
         </collision>
         <inertial>

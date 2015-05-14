@@ -14,25 +14,38 @@
         <param name="pointcloud_min_x" value="-1.2" />
         <param name="pointcloud_max_x" value="1.2" />
         <param name="pointcloud_min_y" value="-1.2" />
-        <param name="pointcloud_max_y" value="0.2" />
-        <param name="pointcloud_min_z" value="-0.2" />
-        <param name="pointcloud_max_z" value="1.2" />
+        <!--param name="pointcloud_max_y" value="0.2" /-->
+        <param name="pointcloud_max_y" value="0.5" />
+        <!--param name="pointcloud_min_z" value="-0.2" /-->
+        <param name="pointcloud_min_z" value="-0.4" />
+        <!--param name="pointcloud_max_z" value="1.2" /-->
+        <param name="pointcloud_max_z" value="1.5" />
         <param name="freezone_min_x" value="-0.5" />
         <!--param name="freezone_min_x" value="-0.45" /-->
         <param name="freezone_min_y" value="-0.7" />
         <!--param name="freezone_min_y" value="-0.6" /-->
         <param name="freezone_min_z" value="0.05" />
-        <param name="freezone_max_x" value="0.21" />
+        <!--param name="freezone_max_x" value="0.21" /-->
+        <param name="freezone_max_x" value="0.3" />
         <param name="freezone_max_y" value="0" />
         <!--param name="freezone_max_y" value="0.2" /-->
         <param name="freezone_max_z" value="1.2" />
-        <param name="torsofree_min_x" value="-0.355" />
+        <param name="torsofree_min_x" value="-0.25" />
         <param name="torsofree_max_x" value="0.21" />
+        <param name="torsofree_min_y" value="-0.355" />
         <param name="sensor_model/max_range" value="1.5" />
         <param name="sensor_model/lower_limit" value = "0.3" />
 
+        <param name="infogain_scoreone" value="80" />
+        <param name="infogain_scoretwo" value="50" />
+        <param name="infogain_scorethree" value="20" />
+        <param name="infogain_weight" value="0.8" />
+        <param name="continuity_weight" value="0.2" />
+
         <param name="plan_endeffector" value="camera_rgb_optical_frame" />
         <param name="plan_group" value="right_arm" />
+
+        <param name="planner_id" value="PRMkConfigDefault" />
 
         <param name="publish_frontier" value="false" />
         <param name="planning_plugin" value="$(arg planning_plugin)" />

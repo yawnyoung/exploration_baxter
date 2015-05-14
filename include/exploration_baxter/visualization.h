@@ -27,4 +27,9 @@ namespace visualization {
      * @brief Visualize markers with 1 size
      */
     void dispMkarr(visualization_msgs::MarkerArray &marker_arr, uint8_t &shape, std_msgs::ColorRGBA &color, geometry_msgs::Vector3 &scale, std::string &frame);
+
+    /**
+     * @brief Visualize points
+     */
+    void dispPoint(visualization_msgs::Marker &marker, std_msgs::ColorRGBA &color, geometry_msgs::Vector3 &scale, std::string &frame);
 } // namespace visualization

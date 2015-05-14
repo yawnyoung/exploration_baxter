@@ -87,3 +87,19 @@ void visualization::dispMkarr(visualization_msgs::MarkerArray &marker_arr, uint8
     }
 }
 
+void visualization::dispPoint(visualization_msgs::Marker &marker, std_msgs::ColorRGBA &color, geometry_msgs::Vector3 &scale, std::string &frame)
+{
+    marker.header.frame_id = frame;
+    marker.header.stamp = ros::Time::now();
+    marker.ns = "map";
+    marker.id = 0;
+    marker.type = visualization_msgs::Marker::SPHERE;
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.pose.orientation.x = 0;
+    marker.pose.orientation.y = 0;
+    marker.pose.orientation.z = 0;
+    marker.pose.orientation.w = 1;
+    marker.scale = scale;
+    marker.color = color;
+}
+

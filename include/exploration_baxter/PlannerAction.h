@@ -24,7 +24,7 @@
 #include <control_msgs/FollowJointTrajectoryAction.h>
 
 typedef std::vector<geometry_msgs::Pose> views;
-typedef std::vector<geometry_msgs::PoseStamped> viewsStamped;
+typedef std::vector<std::pair<octomap::point3d, geometry_msgs::PoseStamped> > viewsStamped;
 typedef actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> TrajClient;
 
 class PlannerAction {
@@ -81,6 +81,8 @@ class PlannerAction {
     bool plan_out;
     /* Action result */
     int action_res;
+    /* Last frontier to be observed */
+    octomap::point3d last_frt;
 
     PlannerAction(ros::NodeHandle nh);
     void motionPlan(viewsStamped &view_cand, octomap::OcTree *ot_map);

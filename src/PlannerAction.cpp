@@ -72,6 +72,11 @@ PlannerAction::PlannerAction(ros::NodeHandle nh):
     last_view.position = last_point;
     last_view.orientation = last_ort;
     ROS_INFO("Last view has been initialized!");
+
+    /* Initialize the last frontier to be observed */
+    last_frt.x() = 0;
+    last_frt.y() = 0;
+    last_frt.z() = 0;
 }
 
 void PlannerAction::RobotStateCB(const sensor_msgs::JointStatePtr& msg)
@@ -139,7 +144,7 @@ void PlannerAction::motionPlan(viewsStamped &view_cand, octomap::OcTree *ot_map)
             continue;
         }*/
         req.goal_constraints.clear();                         // Clear last request
-        moveit_msgs::Constraints pose_goal = kinematic_constraints::constructGoalConstraints(link_name, *cand_it, tolerance_pose, tolerance_angle);
+        moveit_msgs::Constraints pose_goal = kinematic_constraints::constructGoalConstraints(link_name, cand_it->second, tolerance_pose, tolerance_angle);
         req.goal_constraints.push_back(pose_goal);
         planning_interface::PlanningContextPtr context = planner_instance->getPlanningContext(planning_scene, req, res.error_code_);
         context->solve(res);
@@ -163,16 +168,18 @@ void PlannerAction::motionPlan(viewsStamped &view_cand, octomap::OcTree *ot_map)
                     //ROS_INFO_STREAM("The planned joints are: " << res_msg.trajectory.joint_trajectory.joint_names[i]);
                     ROS_INFO_STREAM("Joint: " << res_msg.trajectory.joint_trajectory.joint_names[i] << " Planned position: " << res_msg.trajectory.joint_trajectory.points[0].positions[i]);
                 }
-                ROS_INFO_STREAM("The planned view x: " << cand_it->pose.position.x <<
-                                                " y: " << cand_it->pose.position.y <<
-                                                " z: " << cand_it->pose.position.z);
+                ROS_INFO_STREAM("The planned view x: " << cand_it->second.pose.position.x <<
+                                                " y: " << cand_it->second.pose.position.y <<
+                                                " z: " << cand_it->second.pose.position.z);
                 /* Update last view */
-                last_view.position = cand_it->pose.position;
-                last_view.orientation = cand_it->pose.orientation;
+                last_view.position = cand_it->second.pose.position;
+                last_view.orientation = cand_it->second.pose.orientation;
                 /* Update plan outcome flag */
                 plan_out = true;
                 /* Update action result */
                 action_res = 1;
+                /* Update last frontier */
+                last_frt = cand_it->first;
                 break;
             }
         }
@@ -214,7 +221,7 @@ void PlannerAction::ActPlan()
     control_msgs::FollowJointTrajectoryGoal goal;
     /* Test trajectory points */
     int point_nb = res_msg.trajectory.joint_trajectory.points.size();
-    double step_time = 0.3;
+    double step_time = 0.4;
     //ros::Duration step(move_time / point_nb);
     ros::Duration step(step_time);
     //res_msg.trajectory.joint_trajectory.points[1].time_from_start = move_time;

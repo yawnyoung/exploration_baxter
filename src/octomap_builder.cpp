@@ -24,7 +24,7 @@ OctomapBuilder::OctomapBuilder(ros::NodeHandle nh):
     m_tfPointCloudSub(NULL)
 {
     /* Minimum and maximum values along each axis for pre-defined free zone */
-    double m_freebbxMinX, m_freebbxMinY, m_freebbxMinZ, m_freebbxMaxX, m_freebbxMaxY, m_freebbxMaxZ, torso_freebbxMinX, torso_freebbxMaxX;
+    double m_freebbxMinX, m_freebbxMinY, m_freebbxMinZ, m_freebbxMaxX, m_freebbxMaxY, m_freebbxMaxZ, torso_freebbxMinX, torso_freebbxMaxX, torso_freebbxMinY;
     /* Initialize octomap object & params */
     m_nh.param("resolution", m_res, m_res);
     m_nh.param("sensor_model/nbv_hit", nbv_probHit, nbv_probHit);
@@ -47,6 +47,7 @@ OctomapBuilder::OctomapBuilder(ros::NodeHandle nh):
     m_nh.param("freezone_max_z", m_freebbxMaxZ, m_freebbxMaxZ);
     m_nh.param("torsofree_min_x", torso_freebbxMinX, torso_freebbxMinX);
     m_nh.param("torsofree_max_x", torso_freebbxMaxX, torso_freebbxMaxX);
+    m_nh.param("torsofree_min_y", torso_freebbxMinY, torso_freebbxMinY);
     m_nh.param("sensor_model/max_range", m_maxRange, m_maxRange);
     m_nh.param("filter_speckles", m_filterSpeckles, m_filterSpeckles);
     m_nh.param("pointcloud_topic", m_pointCloudTopic, m_pointCloudTopic);
@@ -105,8 +106,6 @@ OctomapBuilder::OctomapBuilder(ros::NodeHandle nh):
     /* Pre-defined free zone axis-aligned coordinates */
     octomap::point3d m_freebbxmin(m_freebbxMinX, m_freebbxMinY, m_freebbxMinZ);
     octomap::point3d m_freebbxmax(m_freebbxMaxX, m_freebbxMaxY, m_freebbxMaxZ);
-    /* Pre-defined free zone bounding box keys */
-    octomap::OcTreeKey m_freebbxminkey, m_freebbxmaxkey;
     /* Set pre-defined free zone */
     if (nbv_octree->coordToKeyChecked(m_freebbxmin, m_freebbxminkey) && nbv_octree->coordToKeyChecked(m_freebbxmax, m_freebbxmaxkey)) {
         sizeX = m_freebbxmaxkey[0] - m_freebbxminkey[0] + 1;
@@ -126,16 +125,15 @@ OctomapBuilder::OctomapBuilder(ros::NodeHandle nh):
             bbxkey[1] = m_freebbxminkey[1] + dy;
             for (int dz = 0; dz < sizeZ; dz++) {
                 bbxkey[2] = m_freebbxminkey[2] + dz;
-                nbv_octree->updateNode(bbxkey, false, false);
+                octomap::OcTreeNode *updt_node = nbv_octree->updateNode(bbxkey, false, false);
                 mp_octree->updateNode(bbxkey, false, false);
             }
         }
     }
 
     /* Set pre-defined free zone for robot torso */
-    octomap::point3d torso_freebbxmin(torso_freebbxMinX, m_freebbxMaxY, m_pointcloudMinZ);
-    octomap::point3d torso_freebbxmax(torso_freebbxMaxX, m_pointcloudMaxY, m_pointcloudMaxZ);
-    octomap::OcTreeKey torso_freebbxminkey, torso_freebbxmaxkey;
+    octomap::point3d torso_freebbxmin(torso_freebbxMinX, torso_freebbxMinY, m_pointcloudMinZ);
+    octomap::point3d torso_freebbxmax(torso_freebbxMaxX, m_pointcloudMaxY, m_freebbxMaxZ);
     if (nbv_octree->coordToKeyChecked(torso_freebbxmin, torso_freebbxminkey) && nbv_octree->coordToKeyChecked(torso_freebbxmax, torso_freebbxmaxkey)) {
         sizeX = torso_freebbxmaxkey[0] - torso_freebbxminkey[0] + 1;
         sizeY = torso_freebbxmaxkey[1] - torso_freebbxminkey[1] + 1;
@@ -154,7 +152,7 @@ OctomapBuilder::OctomapBuilder(ros::NodeHandle nh):
             bbxkey[1] = torso_freebbxminkey[1] + dy;
             for (int dz = 0; dz < sizeZ; dz++) {
                 bbxkey[2] = torso_freebbxminkey[2] + dz;
-                nbv_octree->updateNode(bbxkey, false, false);
+                octomap::OcTreeNode *updt_node = nbv_octree->updateNode(bbxkey, false, false);
                 mp_octree->updateNode(bbxkey, false, false);
             }
         }
@@ -289,31 +287,36 @@ void OctomapBuilder::insertScandiff(const tf::Point& sensorOriginTf, const PCLPo
         }
     }
 
-    // TODO Record keyset as the public variable
     for (octomap::KeySet::iterator it = free_cells.begin(); it != free_cells.end(); ++it)
     {
-        if (occupied_cells.find(*it) == occupied_cells.end()) {
-            if (!nbv_octree->search(*it)
-                    && (*it)[0] > m_allbbxminkey[0] && (*it)[1] > m_allbbxminkey[1] && (*it)[2] > m_allbbxminkey[2]
-                    && (*it)[0] < m_allbbxmaxkey[0] && (*it)[1] < m_allbbxmaxkey[1] && (*it)[2] < m_allbbxmaxkey[2]) {
-                /* updating pointcloud */
+        if ((*it)[0] > m_allbbxminkey[0] && (*it)[1] > m_allbbxminkey[1] && (*it)[2] > m_allbbxminkey[2]
+                && (*it)[0] < m_allbbxmaxkey[0] && (*it)[1] < m_allbbxmaxkey[1] && (*it)[2] < m_allbbxmaxkey[2]) {
+            if (!nbv_octree->search(*it)) {
                 updt_pc.push_back(octomap::pointOctomapToPCL<pcl::PointXYZ>(nbv_octree->keyToCoord(*it)));
             }
-            nbv_octree->updateNode(*it, false);
-            mp_octree->updateNode(*it, false);
         }
+        octomap::OcTreeNode *updt_node = nbv_octree->updateNode(*it, false);
+        mp_octree->updateNode(*it, false);
     }
     /* Mark all occupied cells */
     for (octomap::KeySet::iterator it = occupied_cells.begin(); it != occupied_cells.end(); ++it)
     {
-        if (!nbv_octree->search(*it)
-                && (*it)[0] > m_allbbxminkey[0] && (*it)[1] > m_allbbxminkey[1] && (*it)[2] > m_allbbxminkey[2]
+        if ((*it)[0] > m_allbbxminkey[0] && (*it)[1] > m_allbbxminkey[1] && (*it)[2] > m_allbbxminkey[2]
                 && (*it)[0] < m_allbbxmaxkey[0] && (*it)[1] < m_allbbxmaxkey[1] && (*it)[2] < m_allbbxmaxkey[2]) {
-            /* updating pointcloud */
-            updt_pc.push_back(octomap::pointOctomapToPCL<pcl::PointXYZ>(nbv_octree->keyToCoord(*it)));
+            if (!nbv_octree->search(*it)) {
+                updt_pc.push_back(octomap::pointOctomapToPCL<pcl::PointXYZ>(nbv_octree->keyToCoord(*it)));
+            }
         }
-        nbv_octree->updateNode(*it, true);
-        mp_octree->updateNode(*it, true);
+        // TODO filter points on the robot itself
+        /* Filter occupied points in the free zone out */
+        if (!((*it)[0] > m_freebbxminkey[0] && (*it)[1] > m_freebbxminkey[1] && (*it)[2] > m_freebbxminkey[2]
+                    && (*it)[0] < m_freebbxmaxkey[0] && (*it)[1] < m_freebbxmaxkey[1] && (*it)[2] < m_freebbxmaxkey[2])) {
+            if (!((*it)[0] > torso_freebbxminkey[0] && (*it)[1] > torso_freebbxminkey[1] && (*it)[2] > torso_freebbxminkey[2]
+                        && (*it)[0] < torso_freebbxmaxkey[0] && (*it)[1] < torso_freebbxmaxkey[1] && (*it)[2] < torso_freebbxmaxkey[2])) {
+                octomap::OcTreeNode *updt_node = nbv_octree->updateNode(*it, true);
+                mp_octree->updateNode(*it, true);
+            }
+        }
     }
 }
 

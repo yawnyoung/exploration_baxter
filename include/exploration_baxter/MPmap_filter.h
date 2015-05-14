@@ -47,8 +47,13 @@ class MPmapFilter {
     ros::Publisher voidfrtPc_pub;
     /* Radius for void-frontier search */
     double voidfrt_radius;
-
-    /* A functor of comparator */
+    /* S1 position */
+    point3d s1_pos;
+    /* Move range 1 */
+    double range_one;
+    /* Move range 2 */
+    double range_two;
+   /* A functor of comparator */
     struct comp_crit {
         const MPmapFilter& m_mapFilter;
         comp_crit( const MPmapFilter& mapFilter) : m_mapFilter(mapFilter) { }
@@ -82,6 +87,23 @@ class MPmapFilter {
     std::vector<std::pair<point3d, double> > cand_pair;
     /* A set of pairs including frontier point and its unknown neighbor */
     std::vector<std::pair<point3d, point3d> > frt_unknown;
+
+    /* Node number in three areas */
+    unsigned int num_areaone;
+    unsigned int num_areatwo;
+    unsigned int num_areathree;
+
+    /* Frontier properties struct */
+    struct frt_prp {
+        point3d frt_node;           // frontier
+        point3d unk_nb;             // unknown neighbor to frontier
+        double sensor_frt;          // distance from sensor origin to frontier
+        bool isvoid;                // flag indicates whether this frontier point is void frontier point
+        double avg_score;             // average score
+    };
+
+    /* A set of frontier properties structs */
+    std::vector<frt_prp> frt_areaone, frt_areatwo, frt_areathree, frt_group;
     /* Frontier pointcloud */
     PointCloud frt_pc;
     /* Real occupied pointcloud */
@@ -90,6 +112,8 @@ class MPmapFilter {
     PointCloud voidfrt_pc;
     /* Proportion of void-frontier points to frontier points */
     double voidfrt_frt;
+    /* Flag indicates whether the last frontier was observed */
+    bool frt_observed;
 
     MPmapFilter(ros::NodeHandle nh, OcTreeKey bbxminkey, OcTreeKey bbxmaxkey);
     /**
@@ -100,15 +124,20 @@ class MPmapFilter {
     void frontierExtraction(OcTree *octree);
     /**
      * @brief Calculate NBV candidates based on frontier cells considering the lower limit of sensor
-     * @input NBV octree, origin of sensor
+     * @input NBV octree, origin of sensor, last frontier
      * @output A set of candidates
      */
-    void FrtNbvCandidates(OcTree *octree, point3d &origin);
+    void FrtNbvCandidates(OcTree *octree, point3d &origin, point3d &last_frontier);
     /**
      * @brief One of criterion functions: Calculate the distance between frontier point and sensor origin
      * @input frontier point, sensor origin
      * @output distance between frontier point and sensor origin
      */
     double Dist_FrtOrg(point3d &frt, point3d &org);
+
+    /**
+     * @brief Extract void frontier for the whole frontier properties group
+     */
+    void VoidfrtgroupExtract();
 
 };
