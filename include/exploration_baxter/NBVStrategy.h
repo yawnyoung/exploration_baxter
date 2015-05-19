@@ -48,6 +48,8 @@ class NBVStrategy {
     Eigen::Affine3d TsensorTorhc;
     /* Information gain score for each area */
     double score_one, score_two, score_three;
+    /* Void frontier score for each area */
+    double scorevoid_one, scorevoid_two, scorevoid_three;
     /* Information gain weight */
     double weight_ig;
     /* Continuity weight */
@@ -129,7 +131,7 @@ class NBVStrategy {
      * @input frontier properties group
      * @output
      */
-    void ScoreAssign(FrtPrp &frtprps);
+    void ScoreAssign(FrtPrp &frtprps, double &propone, double &proptwo, double &propthree);
 
     /*
      * @brief Pick point on a unit sphere randomly
@@ -150,6 +152,10 @@ class NBVStrategy {
     viewsStamped nbvCands;
     /* Next best view candidates including position and orientation for right hand camera */
     viewsStamped RHCnbvCands;
+    /* Frontier properties to be observed */
+    MPmapFilter::frt_prp frtprp_obsv;
+    /* Normal of frontier to be observed */
+    Eigen::Vector3f normal_obsv;
 
     NBVStrategy(ros::NodeHandle nh);
 
@@ -183,7 +189,12 @@ class NBVStrategy {
      * @brief Exploration strategy based on weighted function of continuity and information gain in C space
      *        For each candidate frontier, this function generates K candidate poses to observe it
      * @input
-     * @output
+     * @output Frontier to be observed, Normal estimated of this frontier
      */
-    void ContInfogainMulCands(PointCloud &cloud, FrtPrp &frtprps, int &cand_num, octomap::point3d origin);
+    void ContInfogainMulCands(PointCloud &cloud, FrtPrp &frtprps, octomap::point3d origin, double &propone, double &proptwo, double &propthree);
+
+    /**
+     * @brief Compute pose of given frontier to be observed
+     */
+    void ComputePose(int &cand_num, bool &observed);
 };

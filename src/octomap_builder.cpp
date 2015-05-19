@@ -157,8 +157,41 @@ OctomapBuilder::OctomapBuilder(ros::NodeHandle nh):
             }
         }
     }
-
     ROS_INFO("Pre-defined free zone set!");
+
+    /* Compute the volume of regions in MP map */
+    octomap::point3d s1_pos;            //S1 Position
+    double range_one, range_two;        //Move range for the first two areas
+    s1_pos.x() = 0.0639686;
+    s1_pos.y() = -0.259257;
+    s1_pos.z() = 0.390049;
+    range_one = 0.489;
+    range_two = 0.969;
+    vol_areaone = 0;
+    vol_areatwo = 0;
+    vol_areathree = 0;
+    for (octomap::OcTree::leaf_iterator leaf_it = mp_octree->begin_leafs(); leaf_it != mp_octree->end_leafs(); ++leaf_it)
+    {
+        octomap::point3d leaf_pt = leaf_it.getCoordinate();
+        if (leaf_pt.y() < -0.22 && leaf_pt.distance(s1_pos) < range_one) {
+            double volume = pow(leaf_it.getSize(), 3);
+            vol_areaone += volume;
+        }
+        else if (leaf_pt.y() >= -0.22 && leaf_pt.distance(s1_pos) < range_one || leaf_pt.distance(s1_pos) < range_two) {
+            double volume = pow(leaf_it.getSize(), 3);
+            vol_areatwo += volume;
+        }
+        else {
+            double volume = pow(leaf_it.getSize(), 3);
+            vol_areathree += volume;
+        }
+    }
+    vol_workspace = mp_octree->volume();
+    ROS_INFO_STREAM("The volume of area one is: " << vol_areaone);
+    ROS_INFO_STREAM("The volume of area two is: " << vol_areatwo);
+    ROS_INFO_STREAM("The volume of area three is: " << vol_areathree);
+    ROS_INFO_STREAM("The volume of addition of three areas is: " << vol_areaone + vol_areatwo + vol_areathree);
+    ROS_INFO_STREAM("The volume of work space is: " << vol_workspace);
 
     /* Set neighbor directions for speckles check */
     nb_dir.push_back(octomap::OcTreeLUT::W);

@@ -30,6 +30,11 @@ NBVStrategy::NBVStrategy(ros::NodeHandle nh):
     next1 = 1151752134u;
     next2 = 2070363486u;
 
+    /* Initialize the frontier properties to be observed */
+    frtprp_obsv.frt_node.x() = 0;
+    frtprp_obsv.frt_node.y() = 0;
+    frtprp_obsv.frt_node.z() = 0;
+
     /* Set publisher of visual normals */
     normal_pub = m_nh.advertise<visualization_msgs::MarkerArray>("normals", 1);
     /* Set publisher of frontier point */
@@ -259,7 +264,7 @@ void NBVStrategy::ManeuverContinue(PointCloud &cloud, FrtPrp &areaone, FrtPrp &a
 
 void NBVStrategy::ContInfogain(PointCloud &cloud, FrtPrp &frtprps, int &cand_num, octomap::point3d origin)
 {
-    ScoreAssign(frtprps);
+    //ScoreAssign(frtprps);
     /* Convert sensor origin from octomap::point3d type to Eigen::Vector3f */
     Eigen::Vector3f sensorOrigin(origin.x(), origin.y(), origin.z());
     /* Create a normal estimation class */
@@ -347,9 +352,9 @@ void NBVStrategy::ContInfogain(PointCloud &cloud, FrtPrp &frtprps, int &cand_num
     normal_pub.publish(normalVis);
 }
 
-void NBVStrategy::ContInfogainMulCands(PointCloud &cloud, FrtPrp &frtprps, int &cand_num, octomap::point3d origin)
+void NBVStrategy::ContInfogainMulCands(PointCloud &cloud, FrtPrp &frtprps, octomap::point3d origin, double &propone, double &proptwo, double &propthree)
 {
-    ScoreAssign(frtprps);
+    ScoreAssign(frtprps, propone, proptwo, propthree);
     /* Convert sensor origin from octomap::point3d type to Eigen::Vector3f */
     Eigen::Vector3f sensorOrigin(origin.x(), origin.y(), origin.z());
     /* Create a normal estimation class */
@@ -360,12 +365,6 @@ void NBVStrategy::ContInfogainMulCands(PointCloud &cloud, FrtPrp &frtprps, int &
     m_kdtree->setInputCloud(m_cloud);
     normal_estimate.setSearchMethod(m_kdtree);         // Use kdtree to search point
     int k = 10;                                        // k nearest neighbor search
-    /* Visualization makers for normals */
-    visualization_msgs::MarkerArray normalVis;
-    normalVis.markers.resize(cand_num);                               // Resize normal marker array
-    /* Select top N (cand_num) nearest frontier */
-    nbvCands.clear();                                     // Clear next views
-    nbvCands.resize(cand_num);                            // Set next views size as candidate number
     octomap::point3d near_frt = frtprps[0].frt_node;                    // Near frontier point
     octomap::point3d frt_nb(frtprps[0].unk_nb);
     /* Normal estimation at this point */
@@ -390,8 +389,20 @@ void NBVStrategy::ContInfogainMulCands(PointCloud &cloud, FrtPrp &frtprps, int &
         }
         normal.normalize();                                                                         // Normalize vector
     }
+    normal_obsv = normal;
+    frtprp_obsv = frtprps[0];
+}
+
+void NBVStrategy::ComputePose(int &cand_num, bool &observed)
+{
+    /* Select top N (cand_num) nearest frontier */
+    nbvCands.clear();                                     // Clear next views
+    nbvCands.resize(cand_num);                            // Set next views size as candidate number
+    /* Visualization makers for normals */
+    visualization_msgs::MarkerArray normalVis;
+    normalVis.markers.resize(cand_num);                               // Resize normal marker array
     for (int i = 0; i < cand_num; i++) {
-        Eigen::Vector3f random_pt = RandomPointHemisphere(normal);
+        Eigen::Vector3f random_pt = RandomPointHemisphere(normal_obsv);
         //Eigen::Vector3f random_pt = RandomPointSphere();
         //ROS_INFO_STREAM("The x: " << random_pt.x() << " The y: " << random_pt.y() << " The z: " << random_pt.z());
         Eigen::Vector3f mp_orient_identity(0, 0, 1);                                                // Calculate rotation transformation between z axes
@@ -411,16 +422,21 @@ void NBVStrategy::ContInfogainMulCands(PointCloud &cloud, FrtPrp &frtprps, int &
         normalVis.markers[i].pose.orientation.z = vis_orient.z();
         normalVis.markers[i].pose.orientation.w = vis_orient.w();
 
-        if (!frtprps[0].isvoid) {
-            random_pt = random_pt * lower_limit;
+        if (observed) {
+             if (!frtprp_obsv.isvoid) {
+                random_pt = random_pt * lower_limit;
+            }
+            else {
+                random_pt = random_pt * 0.5;
+            }
         }
         else {
             random_pt = random_pt * 0.5;
         }
         nbvCands[i].second.header.frame_id = m_WorldFrame;
-        nbvCands[i].second.pose.position.x = random_pt.x() + near_frt.x();
-        nbvCands[i].second.pose.position.y = random_pt.y() + near_frt.y();
-        nbvCands[i].second.pose.position.z = random_pt.z() + near_frt.z();
+        nbvCands[i].second.pose.position.x = random_pt.x() + frtprp_obsv.frt_node.x();
+        nbvCands[i].second.pose.position.y = random_pt.y() + frtprp_obsv.frt_node.y();
+        nbvCands[i].second.pose.position.z = random_pt.z() + frtprp_obsv.frt_node.z();
 
         normalVis.markers[i].pose.position = nbvCands[i].second.pose.position;
     }
@@ -443,9 +459,9 @@ void NBVStrategy::ContInfogainMulCands(PointCloud &cloud, FrtPrp &frtprps, int &
 
     /* Display the frontier point to be observed */
     visualization_msgs::Marker frtptVis;
-    frtptVis.pose.position.x = near_frt.x();
-    frtptVis.pose.position.y = near_frt.y();
-    frtptVis.pose.position.z = near_frt.z();
+    frtptVis.pose.position.x = frtprp_obsv.frt_node.x();
+    frtptVis.pose.position.y = frtprp_obsv.frt_node.y();
+    frtptVis.pose.position.z = frtprp_obsv.frt_node.z();
     std_msgs::ColorRGBA frtpt_color;
     frtpt_color.a = 1.0;
     frtpt_color.r = 1.0;
@@ -459,20 +475,53 @@ void NBVStrategy::ContInfogainMulCands(PointCloud &cloud, FrtPrp &frtprps, int &
     frtpt_pub.publish(frtptVis);
 }
 
-void NBVStrategy::ScoreAssign(FrtPrp &frtprps)
+void NBVStrategy::ScoreAssign(FrtPrp &frtprps, double &propone, double &proptwo, double &propthree)
 {
     double max_dist = (std::max_element(frtprps.begin(), frtprps.end(), maxmin_dist(*this)))->sensor_frt;
     double min_dist = (std::min_element(frtprps.begin(), frtprps.end(), maxmin_dist(*this)))->sensor_frt;
     for (FrtPrp::iterator it = frtprps.begin(); it != frtprps.end(); it++)
     {
         if (it->frt_node.y() < -0.22 && it->frt_node.distance(s1_pos) < range_one) {
-            it->avg_score = weight_ig * score_one;
+            if (propone < 0.97) {
+             if (!it->isvoid) {
+                it->avg_score = weight_ig * score_one;
+            }
+            else {
+                it->avg_score = 0;
+            }
+            }
+            else {
+                it->avg_score = 0;
+            }
+
         }
         else if (it->frt_node.y() >= -0.22 && it->frt_node.distance(s1_pos) < range_one || it->frt_node.distance(s1_pos) < range_two) {
-            it->avg_score = weight_ig * score_two;
+            if (proptwo < 0.95) {
+             if (!it->isvoid) {
+                it->avg_score = weight_ig * score_two;
+            }
+            else {
+                it->avg_score = 0;
+            }
+            }
+            else {
+                it->avg_score = 0;
+            }
+
         }
         else {
-            it->avg_score = weight_ig * score_three;
+            if (propthree < 0.9) {
+             if (!it->isvoid) {
+                it->avg_score = weight_ig * score_three;
+            }
+            else {
+                it->avg_score = 0;
+            }
+            }
+            else {
+                it->avg_score = 0;
+            }
+
         }
         double score_cont = (max_dist - it->sensor_frt) / (max_dist - min_dist) * 100;
         it->avg_score += weight_cont * score_cont;

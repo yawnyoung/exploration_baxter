@@ -679,7 +679,7 @@
         <child link="right_hand_camera"/>
     </joint>
     <joint name="camera_rgb_optical_frame" type="fixed">
-        <origin rpy="0.178573 -0.00506743 0.0677429" xyz="-0.00485757 -0.0810587 0.0164881" />
+        <origin rpy="0.316951 -0.0163395 0.0607724" xyz="-0.00816875 -0.0701083 0.0151665" />
         <parent link="right_hand_camera" />
         <child link="camera_rgb_optical_frame" />
     </joint>

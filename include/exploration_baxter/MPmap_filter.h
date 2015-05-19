@@ -53,6 +53,8 @@ class MPmapFilter {
     double range_one;
     /* Move range 2 */
     double range_two;
+    /* Number of frontier points in each area */
+    unsigned int num_frtone, num_frttwo, num_frtthree;
    /* A functor of comparator */
     struct comp_crit {
         const MPmapFilter& m_mapFilter;
@@ -89,9 +91,7 @@ class MPmapFilter {
     std::vector<std::pair<point3d, point3d> > frt_unknown;
 
     /* Node number in three areas */
-    unsigned int num_areaone;
-    unsigned int num_areatwo;
-    unsigned int num_areathree;
+    double vol_areaone_nbv, vol_areatwo_nbv, vol_areathree_nbv, vol_workspace_nbv;
 
     /* Frontier properties struct */
     struct frt_prp {
@@ -112,6 +112,8 @@ class MPmapFilter {
     PointCloud voidfrt_pc;
     /* Proportion of void-frontier points to frontier points */
     double voidfrt_frt;
+    /* Proportion of void-frontier points to frontier points in each area */
+    double voidfrt_frtone, voidfrt_frttwo, voidfrt_frtthree;
     /* Flag indicates whether the last frontier was observed */
     bool frt_observed;
 

@@ -86,7 +86,6 @@ class OctomapBuilder {
     ros::Publisher updtPc_pub;
     /* Thread to start building octomap */
     boost::thread *build_thread;
-
     virtual void insertClouddiffCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud);
     virtual void specklesfilter();
 
@@ -112,6 +111,11 @@ class OctomapBuilder {
         /* Size of inserted pointcloud */
         unsigned int size_insert;
 
+        /* Volume of each region */
+        double vol_areaone, vol_areatwo, vol_areathree;
+
+        /* Total volume whole work space */
+        double vol_workspace;
         /*
          * @brief Start to collect data
          */

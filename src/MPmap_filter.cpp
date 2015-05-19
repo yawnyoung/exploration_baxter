@@ -6,7 +6,7 @@ MPmapFilter::MPmapFilter(ros::NodeHandle nh, OcTreeKey bbxminkey, OcTreeKey bbxm
     mp_octree(NULL),
     nbv_bbxminkey(bbxminkey),
     nbv_bbxmaxkey(bbxmaxkey),
-    voidfrt_radius(0.2),   // Set default to be 10 cm
+    voidfrt_radius(0.1),   // Set default to be 10 cm
     isPublishFrt(true)      // Set default value to be true in order to publish frontier visualization cells by default
 {
     /* Get parameter */
@@ -132,10 +132,15 @@ void MPmapFilter::FrtNbvCandidates(OcTree *octree, point3d &origin, point3d &las
     frt_pc.clear();
     /* Clear PCL occupied pointcloud */
     occ_pc.clear();
-    /* Clear node numbers in areas */
-    num_areaone = 0;
-    num_areatwo = 0;
-    num_areathree = 0;
+    /* Clear volume for each area */
+    vol_areaone_nbv = 0;
+    vol_areatwo_nbv = 0;
+    vol_areathree_nbv = 0;
+    vol_workspace_nbv = 0;
+    /* Clear number of nodes in each area */
+    num_frtone = 0;
+    num_frttwo = 0;
+    num_frtthree = 0;
     /* Initialize the flag of frontier observation */
     frt_observed = true;
 
@@ -148,15 +153,17 @@ void MPmapFilter::FrtNbvCandidates(OcTree *octree, point3d &origin, point3d &las
         if (leaf_key[0] > nbv_bbxminkey[0] && leaf_key[1] > nbv_bbxminkey[1] && leaf_key[2] < nbv_bbxmaxkey[2]
                 && leaf_key[0] < nbv_bbxmaxkey[0] && leaf_key[1] < nbv_bbxmaxkey[1] && leaf_key[2] > nbv_bbxminkey[2])
         {
+            vol_workspace_nbv += pow(leaf_it.getSize(), 3);
             point3d leaf_pt = leaf_it.getCoordinate();
+            /* Record the node number in each area for nbv_octree */
             if (leaf_pt.y() < -0.22 && leaf_pt.distance(s1_pos) < range_one) {
-                num_areaone++;
+                vol_areaone_nbv += pow(leaf_it.getSize(), 3);
             }
             else if (leaf_pt.y() >= -0.22 && leaf_pt.distance(s1_pos) < range_one || leaf_pt.distance(s1_pos) < range_two) {
-                num_areatwo++;
+                vol_areatwo_nbv += pow(leaf_it.getSize(), 3);
             }
             else {
-                num_areathree++;
+                vol_areathree_nbv += pow(leaf_it.getSize(), 3);
             }
             if (!octree->isNodeOccupied(*leaf_it)) {
                 for (std::vector<OcTreeLUT::NeighborDirection>::iterator nb_dir_it = nb_dir.begin(); nb_dir_it != nb_dir.end(); ++nb_dir_it)
@@ -182,17 +189,21 @@ void MPmapFilter::FrtNbvCandidates(OcTree *octree, point3d &origin, point3d &las
                         // Area one
                         if (frt_point.y() < -0.22 && frt_point.distance(s1_pos) < range_one) {
                             frt_areaone.push_back(m_frtprp);
+                            num_frtone ++;
                         }
                         // Area two
                         else if (frt_point.y() >= -0.22 && frt_point.distance(s1_pos) < range_one) {
                             frt_areatwo.push_back(m_frtprp);
+                            num_frttwo ++;
                         }
                         else if (frt_point.distance(s1_pos) < range_two) {
                             frt_areatwo.push_back(m_frtprp);
+                            num_frttwo ++;
                         }
                         // Area three
                         else {
                             frt_areathree.push_back(m_frtprp);
+                            num_frtthree ++;
                         }
 
                         /* Frontier group for all frontier cells */
@@ -222,7 +233,7 @@ void MPmapFilter::FrtNbvCandidates(OcTree *octree, point3d &origin, point3d &las
         std::vector<float> sqr_dists;
         /* Search occupied neighbors within radius search */
         pcl::PointXYZ frtpt(last_frontier.x(), last_frontier.y(), last_frontier.z());
-        if (frt_kdtree.radiusSearch(frtpt, 0.1, indices, sqr_dists) > 0) {
+        if (frt_kdtree.radiusSearch(frtpt, 0.005, indices, sqr_dists) > 0) {
             frt_observed = false;
         }
     }
@@ -347,7 +358,10 @@ void MPmapFilter::VoidfrtgroupExtract()
     pcl::KdTreeFLANN<pcl::PointXYZ> occ_kdtree;
     occ_kdtree.setInputCloud(occPc_ptr);
     /* Number of void-frontier points */
-    unsigned int num_voidfrt = 0;
+    unsigned int num_voidfrtone, num_voidfrttwo, num_voidfrtthree;
+    num_voidfrtone = 0;
+    num_voidfrttwo = 0;
+    num_voidfrtthree = 0;
     /* Clear void-frontier pointcloud */
     voidfrt_pc.clear();
     for (std::vector<frt_prp>::iterator m_it = frt_group.begin(); m_it != frt_group.end(); m_it++)
@@ -357,7 +371,7 @@ void MPmapFilter::VoidfrtgroupExtract()
         /* Search occupied neighbors within radius search */
         pcl::PointXYZ itpt(m_it->frt_node.x(), m_it->frt_node.y(), m_it->frt_node.z());
         if (occ_kdtree.radiusSearch(itpt, voidfrt_radius, indices, sqr_dists) > 5) {
-            pcl::PointXYZ occpt(occPc_ptr->points[indices[0] ]);
+            /*pcl::PointXYZ occpt(occPc_ptr->points[indices[0] ]);
             Eigen::Vector3f occpt_eig(occpt.x, occpt.y, occpt.z);
             Eigen::Vector3f itnb_eig(m_it->unk_nb.x(), m_it->unk_nb.y(), m_it->unk_nb.z());
             Eigen::Vector3f itpt_eig(itpt.x, itpt.y, itpt.z);
@@ -367,8 +381,23 @@ void MPmapFilter::VoidfrtgroupExtract()
                 ++num_voidfrt;
                 voidfrt_pc.push_back(itpt);
                 m_it->isvoid = true;
+            }*/
+
+            // TODO Distinguish void_frontier in different areas
+            if (m_it->frt_node.y() < -0.22 && m_it->frt_node.distance(s1_pos) < range_one) {
+                num_voidfrtone++;
             }
+            else if (m_it->frt_node.y() >= 0.22 && m_it->frt_node.distance(s1_pos) < range_one || m_it->frt_node.distance(s1_pos) < range_two) {
+                num_voidfrttwo++;
+            }
+            else {
+                num_voidfrtthree++;
+            }
+            voidfrt_pc.push_back(itpt);
+            m_it->isvoid = true;
         }
     }
-    voidfrt_frt = double(num_voidfrt) / double(frt_pc.size());
+    voidfrt_frtone = double(num_voidfrtone) / double(num_frtone);
+    voidfrt_frttwo = double(num_voidfrttwo) / double(num_frttwo);
+    voidfrt_frtthree = double(num_voidfrtthree) / double(num_frtthree);
 }
