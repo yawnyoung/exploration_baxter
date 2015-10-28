@@ -1,2 +1,2 @@
 # exploration_baxter
-This is a repository for thesis project
+This is a repository for exploration system
